@@ -5,6 +5,7 @@ instale só o que faz sentido na máquina.
 
 | Plugin | O que faz | Escopo |
 |---|---|---|
+| **alicerce** | Planeja o passo 0 de um projeto novo, ou audita a fundação de um já existente | genérico |
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
@@ -13,10 +14,56 @@ instale só o que faz sentido na máquina.
 
 ```
 /plugin marketplace add arianekevin/skills
+/plugin install alicerce@skills
 /plugin install ciclo@skills
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills
 ```
+
+---
+
+## alicerce
+
+O documento que deveria existir antes da primeira linha de código — e que quase nunca existe.
+A skill detecta sozinha em qual dos dois casos você está:
+
+```
+/alicerce
+```
+
+**Projeto novo.** Faz no máximo cinco perguntas, em uma rodada só, com opções para marcar.
+A que mais importa é o **horizonte**: protótipo descartável, produto interno ou produção — é ela que
+calibra o que é essencial. Protótipo com fundação de produção é desperdício; produto com fundação de
+protótipo é dívida. Sai um `docs/PLANO-FUNDACAO.md` dividido em três ondas, cabendo em 1–2 dias.
+
+**Projeto existente.** Lê o repositório e uma feature real ponta a ponta, marca a régua de oito áreas
+com ✅ ⚠️ ❌ —, e escreve um `docs/DIAGNOSTICO-FUNDACAO.md` com plano priorizado. O achado mais útil
+raramente é o ❌: é o ⚠️ — o CI que só roda lint, o README cujos comandos não rodam mais, o token de
+design com cor hardcoded em metade dos componentes. Por isso a régua manda **verificar na prática**,
+nunca pela presença do arquivo.
+
+**A régua (`references/checklist-fundacao.md`):** produto e não-escopo · decisões registradas (ADR) ·
+repo, tooling e CI · convenções e estrutura · design system · documentação viva · dados e
+configuração · operação e segurança. Cada item traz prioridade e o sinal de detecção no repo.
+
+**O que ela garante:**
+
+- **A ordem segue custo de reversão, não estética.** Migration versionada, forma de erro, tokens e
+  modelo de permissão são baratos no dia 1 e caros no dia 90 — por isso vêm antes.
+- **Design system em camadas, nessa ordem.** Tokens → primitivos → padrões. Componente bonito sem
+  escala de espaçamento por trás é sinal de que começaram pelo fim.
+- **"Adiado de propósito" é seção obrigatória**, com o gatilho de revisita. Microserviços, i18n,
+  cache, feature flags. Transforma "esquecemos" em "decidimos".
+- **"Adotar daqui pra frente".** Na auditoria, nomeia a lacuna que não vale corrigir retroativamente —
+  projeto de três anos não reescreve histórico de migration, adota o padrão para código novo.
+- **Adota a convenção da casa.** Lê o `CLAUDE.md` e projetos vizinhos antes de propor qualquer padrão.
+  Consistência entre projetos vale mais que a escolha ótima em um.
+- **Diagnóstico, não julgamento.** Relata a consequência da lacuna, não adjetivo. Projeto em produção
+  sem ADR não é projeto ruim — é projeto que priorizou entrega.
+
+**Limites:** não implementa nada. Escreve o plano e pergunta se você quer executar a Onda 1 — a
+execução é um pedido seu, item por item. Os únicos arquivos que cria são o documento e o template
+de ADR.
 
 ---
 
