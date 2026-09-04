@@ -1,7 +1,7 @@
 {
   "name": "bug-diagnostico",
   "description": "Bug investigation assistant for NectarCRM (Java Struts + AngularJS). Helps the developer reach the root cause before any fix exists, starting from a search of the history by technical signature. Deliberately refuses to write corrections — that is bug-guardrail's job.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "arianecasas"
   },

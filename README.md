@@ -105,9 +105,21 @@ cria que nenhuma delas pediria sozinha.
 - **Diagnóstico, não julgamento.** Relata a consequência da lacuna, não adjetivo. Projeto em produção
   sem ADR não é projeto ruim — é projeto que priorizou entrega.
 
+- **O horizonte corta a lista do domínio.** As duas calibragens podem se contradizer — "protótipo
+  descartável" pede README e nada mais, o domínio pede trilha append-only. Sem corte explícito, você
+  recebe fundação de produto para código que vai ser jogado fora. Quando a exigência for boa demais
+  para cortar, ela pergunta em vez de decidir sozinha, e registra no plano o que foi mantido contra a
+  calibragem.
+
 **Limites:** não implementa nada. Escreve o plano e pergunta se você quer executar a Onda 1 — a
 execução é um pedido seu, item por item. Os únicos arquivos que cria são o documento e o template
 de ADR.
+
+**Na execução**, se você mandar executar: não encosta em processo, porta ou container fora do projeto
+(mata por PID guardado, nunca por padrão de nome); ferramenta que resiste duas vezes tem o default
+adotado, porque tooling de Onda 1 não pode virar o projeto; cada onda fecha com uma tabela de
+verificação onde cada linha traz o comando que a provou; e todo desvio do plano volta para o
+documento, que é vivo.
 
 ---
 

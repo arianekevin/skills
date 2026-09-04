@@ -36,6 +36,35 @@ Ofereça opções concretas em cada pergunta, não campo aberto. O dev responde 
 Não empurre fundação de produção num protótipo. É o erro simétrico de não ter
 fundação nenhuma, e custa igual.
 
+### O horizonte corta a lista do domínio — passo obrigatório
+
+As duas calibragens são independentes e **podem se contradizer**: o domínio pede
+trilha append-only e ator até a camada que grava; o horizonte "protótipo descartável"
+pede README e nada mais. Sem um corte explícito, você obedece as duas e entrega
+fundação de produto para código que vai ser jogado fora.
+
+Antes de escrever o plano, cruze as duas listas:
+
+| Horizonte | O que sobra das exigências do domínio |
+|---|---|
+| Protótipo descartável | **Nenhuma por padrão.** Só entra a que o dev confirmar |
+| Produto interno | As P0 que encostam no modelo de dados. As demais, adiadas |
+| Produção | A lista inteira |
+
+Se alguma exigência do domínio parecer boa demais para cortar num protótipo — e às
+vezes é, porque append-only muda o modelo de dados e retrofitar é caro —, **diga isso
+em voz alta e deixe o dev decidir**:
+
+> "Você marcou protótipo descartável, então por regra eu cortaria o histórico
+> append-only. Mas ele muda o modelo de dados e é o item mais caro de acrescentar
+> depois. Mantenho, ou corto e a gente aceita perder o histórico se isso virar
+> produto?"
+
+O que não pode é entregar em silêncio o oposto do que a calibragem pediu. Se o dev
+mandar manter, registre no plano que a exigência **contraria o horizonte declarado**,
+com a justificativa — assim, quem ler depois entende por que um protótipo tem trigger
+de banco.
+
 ## 4. Montar o plano
 
 Junte duas listas: as exigências derivadas do domínio (passo 1) e a régua genérica —

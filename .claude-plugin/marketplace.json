@@ -1,6 +1,6 @@
 {
   "name": "skills",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Skills for Claude Code: a project-foundation planner, an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
   "owner": {
     "name": "arianecasas"

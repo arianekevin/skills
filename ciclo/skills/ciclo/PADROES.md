@@ -42,6 +42,13 @@ declarada — o dev vai atrás e perde a viagem.
 onde você procurou e se aquele era o lugar certo. Ambiente errado, branch errada,
 tenant sem migration aplicada — todos produzem "não existe" falso.
 
+**Vale também para a sua própria escrita.** Edição por âncora de texto falha **em
+silêncio** quando o arquivo mudou desde que você o leu — um formatter rodou, um rename
+aconteceu, outra edição sua passou antes. Depois de escrever, confirme que aplicou: um
+`grep` no trecho novo, ou o comando que agora precisa passar. Seguir supondo que pegou
+é a mesma falha de procedência, virada para dentro — e ela se repete, porque a
+suposição errada continua valendo na edição seguinte.
+
 ## 3. Escrita fora do repositório: só com pedido explícito
 
 Ler é o uso previsto. **Escrever exige pedido do dev naquela sessão**, e vale para:
@@ -50,6 +57,12 @@ chamada que altera dado em ambiente compartilhado.
 
 Autorização não se estende: aprovar um push não aprova o próximo, e aprovar um
 comentário em ticket não aprova mexer no estado dele.
+
+**E não encoste em processo, porta ou container que não é seu.** A máquina do dev tem
+outros projetos rodando. Encerre pelo **PID que você mesmo guardou**, nunca por padrão
+de nome — `pkill -f vite` derruba o servidor de desenvolvimento de outro projeto, e
+você nem fica sabendo qual era. Antes de subir serviço, confira se a porta está livre
+e **fixe** a sua; antes de parar um container, confirme que foi você quem o subiu.
 
 ## 4. Saída honesta: declare o travamento em vez de fechar
 

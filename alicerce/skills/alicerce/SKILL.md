@@ -98,6 +98,30 @@ Não despeje o documento inteiro no terminal.
 
 Pergunte ao final, em uma linha: *"Quer que eu execute a Onda 1 agora?"*
 
+## Executando uma onda (só depois do dev pedir)
+
+**Não encoste em nada fora do projeto.** Vale o `PADROES.md`, e aqui é onde mais
+machuca: a máquina tem outros projetos de pé. Guarde o PID do que você subir e mate
+por ele; confira a porta antes e **fixe** a sua (`strictPort`); não pare container que
+não foi você quem subiu.
+
+**Ferramenta que resiste duas vezes, você adota o padrão dela.** Se a segunda tentativa
+de configurar linter, formatter ou build não resolveu, pare de brigar: aceite o default
+da ferramenta, registre como desvio e siga. Tooling de Onda 1 não pode virar o projeto
+— ele existe para destravar a Onda 2.
+
+**Cada onda termina com uma tabela de verificação**, e cada linha traz o comando que a
+provou. "Testes passando" não é linha; `npm test → 1/1` é. O que você não rodou, marque
+como não verificado — nunca como feito.
+
+| Item | Comando | Resultado |
+|---|---|---|
+
+**Desvio volta para o documento.** Quando a realidade contrariar o plano — versão que
+não existe, porta ocupada, biblioteca que mudou de forma — anote na tabela de desvios
+do `PLANO-FUNDACAO.md` com o que foi feito no lugar. O plano é documento vivo; plano
+que só descreve o dia 1 vira ficção na primeira semana.
+
 ## Adaptação ao contexto
 
 Antes de escrever o plano, verifique o que **já é padrão da casa** e não reinvente:

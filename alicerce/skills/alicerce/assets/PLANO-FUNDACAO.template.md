@@ -27,6 +27,11 @@ e normalmente as mais caras de deixar pra depois, porque encostam no modelo de d
 |---|---|---|
 | | | |
 
+**Cortadas pelo horizonte:** {exigências que o domínio pedia e o horizonte descartou}
+**Mantidas contra o horizonte:** {as que o dev decidiu manter mesmo contrariando a
+calibragem, com a justificativa — para quem ler depois entender por que um protótipo
+tem, por exemplo, trigger de banco}
+
 **Da combinação:** {o que a interseção dos domínios cria e nenhum deles sozinho pediria}
 
 ### Suposições assumidas
@@ -79,6 +84,42 @@ exigência central do domínio ela exercita}
 **Regra de dependência:** {ex.: domínio não importa infra}
 **Commits:** {ex.: Conventional Commits}
 **Branches:** {ex.: trunk-based, PR obrigatório}
+
+---
+
+## Verificação por onda
+
+_Preenchido ao fim de cada onda. Cada linha traz o comando que provou. O que não foi
+rodado entra como **não verificado**, nunca como feito._
+
+### Onda 1
+
+| Item | Comando | Resultado |
+|---|---|---|
+| | | |
+
+### Onda 2
+
+| Item | Comando | Resultado |
+|---|---|---|
+| | | |
+
+### Onda 3
+
+| Item | Comando | Resultado |
+|---|---|---|
+| | | |
+
+---
+
+## Desvios do plano
+
+_Onde a realidade contrariou o plano, e o que foi feito no lugar. Este documento é
+vivo: plano que só descreve o dia 1 vira ficção na primeira semana._
+
+| Onda | O plano dizia | O que aconteceu | O que ficou no lugar |
+|---|---|---|---|
+| | | | |
 
 ---
 
