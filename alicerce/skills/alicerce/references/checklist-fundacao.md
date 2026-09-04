@@ -1,5 +1,10 @@
 # A régua — o que "bem fundado" significa
 
+**Esta régua é o piso, não o plano.** Ela vale para qualquer projeto, e por isso não
+sabe nada sobre o seu. Leia `dominio.md` **antes** e some as exigências de lá — são
+elas que costumam ser as mais caras de retrofitar, porque mexem no modelo de dados.
+Plano que só tem esta régua é plano que não olhou pro projeto.
+
 Oito áreas. Cada item tem **prioridade** e **sinal de detecção** (o que procurar no repo).
 
 Prioridades:

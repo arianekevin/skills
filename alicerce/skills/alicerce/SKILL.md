@@ -18,13 +18,39 @@ transforma protótipo em dívida.
 1. **Não implementa.** Esta skill produz um documento de plano. Nenhum arquivo de
    código, nenhum `npm install`, nenhum scaffold. Se o dev quiser executar, ele pede
    depois — aí sim você executa item por item.
-2. **Uma rodada de perguntas, no máximo 5.** Use `AskUserQuestion` uma única vez.
-   O que não for perguntado, você assume e **registra a suposição** no documento.
+2. **O domínio vem antes de tudo, em texto livre.** Nunca ofereça múltipla escolha
+   para "o que é o projeto" — é a única pergunta que não pode ser fechada. Só depois
+   de ter a frase do projeto use `AskUserQuestion`, uma única vez, no máximo 4
+   perguntas, e só para **calibragem**. O que não for perguntado, você assume e
+   **registra a suposição** no documento.
 3. **O plano cabe em 1–2 dias de trabalho.** Se passar disso, cortou de menos.
    Fundação que vira projeto de um mês virou cerimônia.
 4. **Adiar é uma decisão legítima.** Itens caros-cedo entram; itens caros-tarde
    (microserviços, i18n, cache, feature flags) vão para uma seção "Adiado de
    propósito", com o sinal que dispara a revisita.
+
+## Passo 0 — o que é o projeto (cancela)
+
+**Não escreva plano nenhum sem uma frase do que o projeto é.** Um software financeiro
+com integração bancária e um site pessoal compartilham talvez 40% da fundação — stack,
+o que é P0, e o que sequer existe na régua genérica mudam por completo. Plano escrito
+sem domínio é plano genérico, e plano genérico é ruído.
+
+Se o dev já disse (`/alicerce quero fazer um software financeiro com IA e integração
+com grandes bancos`), você já tem. **Não pergunte de novo.**
+
+Se não disse, pergunte em texto livre, uma linha, antes de qualquer outra coisa:
+
+> "Me conta em uma ou duas frases o que é esse projeto e pra quem — quanto mais
+> concreto, melhor o plano. Ex.: 'software financeiro com IA que concilia extratos
+> via integração com grandes bancos, pra time de controladoria'."
+
+Com a frase em mãos, leia `references/dominio.md` e derive **o que este domínio
+específico exige** antes de abrir a régua genérica. Esse é o passo que separa um
+plano útil de uma lista de boas práticas.
+
+No modo auditoria, o domínio se infere do código — mas ainda assim se **confirma**
+em uma linha antes de julgar qualquer coisa.
 
 ## Passo 1 — detectar o modo
 
@@ -48,8 +74,9 @@ Na dúvida (ex.: um protótipo solto de um arquivo), pergunte em uma linha:
 - **NOVO** → leia `references/modo-novo.md` e siga.
 - **AUDITORIA** → leia `references/modo-auditoria.md` e siga.
 
-Ambos usam a mesma régua: `references/checklist-fundacao.md`. Leia a régua **sempre**,
-nos dois modos — é ela que define o que "estar bem fundado" significa.
+Ambos usam a mesma régua: `references/checklist-fundacao.md`, sempre **depois** de
+`references/dominio.md`. A régua é o piso comum; o domínio é o que se soma a ela.
+Um plano que só tem a régua genérica é um plano que não olhou pro projeto.
 
 ## Passo 3 — entregar
 
@@ -79,6 +106,7 @@ Consistência entre projetos vale mais que a escolha ótima em um.
 
 ## Referências
 
+- `references/dominio.md` — como o domínio muda a stack e cria exigências próprias
 - `references/checklist-fundacao.md` — a régua: 8 áreas, o que é P0/P1/P2, como detectar
 - `references/modo-novo.md` — as perguntas e como montar o plano do zero
 - `references/modo-auditoria.md` — como levantar o que existe e priorizar as lacunas

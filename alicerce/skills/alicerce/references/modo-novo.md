@@ -25,7 +25,7 @@ uma pergunta, faça essa.
 Ofereça opções concretas em cada pergunta, não campo aberto. O dev responde em
 15 segundos em vez de escrever um parágrafo.
 
-## 2. Calibrar pelo horizonte
+## 3. Calibrar pelo horizonte
 
 | Horizonte | O que vira P0 |
 |---|---|
@@ -36,23 +36,28 @@ Ofereça opções concretas em cada pergunta, não campo aberto. O dev responde 
 Não empurre fundação de produção num protótipo. É o erro simétrico de não ter
 fundação nenhuma, e custa igual.
 
-## 3. Montar o plano
+## 4. Montar o plano
 
-Percorra `checklist-fundacao.md`, marcando cada item como **entra / N/A / adiado**.
+Junte duas listas: as exigências derivadas do domínio (passo 1) e a régua genérica —
+percorra `checklist-fundacao.md` marcando cada item como **entra / N/A / adiado**.
 Depois agrupe em três ondas por dependência:
 
 - **Onda 1 — esqueleto (algumas horas).** Repo, tooling, CI verde, `.env.example`,
   README mínimo, ADRs iniciais. Nada de feature. Termina com CI verde no commit 1.
 - **Onda 2 — o eixo (meio dia).** Estrutura de pastas, convenções, tokens de design,
-  migration inicial, forma de erro e log. Termina com **uma feature de referência**
-  ponta a ponta — fina, mas atravessando todas as camadas.
+  migration inicial, forma de erro e log — **mais as exigências P0 do domínio**, que
+  quase sempre caem aqui porque encostam no modelo de dados. Termina com **uma feature
+  de referência** ponta a ponta, fina mas atravessando todas as camadas.
 - **Onda 3 — o resto.** Primitivos de UI, seed, CONTRIBUTING, CHANGELOG.
 
 A feature de referência da Onda 2 é o entregável mais valioso do plano inteiro:
 ela vira o template que todo o resto copia, humano ou IA. Escolha a mais fina que
-ainda atravesse todas as camadas (ex.: um cadastro com um campo).
+ainda atravesse todas as camadas — e que **exercite a exigência central do domínio**.
+Num financeiro com integração bancária, "importar um extrato de um banco e conciliar
+uma linha" vale dez vezes mais que "cadastro de usuário": prova a camada de tradução,
+a idempotência, o decimal e a trilha de auditoria de uma vez.
 
-## 4. Escrever
+## 5. Escrever
 
 Preencha `assets/PLANO-FUNDACAO.template.md` em `docs/PLANO-FUNDACAO.md`.
 Gere também `docs/adr/0000-template.md` a partir de `assets/adr-0000.template.md` —
@@ -60,6 +65,7 @@ Gere também `docs/adr/0000-template.md` a partir de `assets/adr-0000.template.m
 
 Cada item do plano precisa de: **o que fazer**, **por que agora** (uma linha),
 e **como saber que está pronto**. Item sem critério de pronto vira item eterno.
+Nos itens vindos do domínio, o "por que agora" cita o domínio explicitamente.
 
 Escreva os ADRs iniciais como **títulos com a decisão já tomada** quando ela for
 óbvia pelas respostas ("0001 — Usar Postgres"), e como pergunta em aberto quando não

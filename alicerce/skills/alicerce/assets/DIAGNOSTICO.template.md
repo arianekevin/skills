@@ -9,6 +9,9 @@ _Gerado em {DATA}. Fotografia do estado atual, não julgamento do projeto._
 **Natureza:** {}
 **Feature lida como referência:** {caminho}
 
+**Domínio, como entendi:** {um X que faz Y para Z — confirmado com o dev}
+**Família(s):** {ex.: financeiro/regulado + integração com terceiros}
+
 ---
 
 ## Placar por área
@@ -17,6 +20,7 @@ Legenda: ✅ existe · ⚠️ parcial ou não seguido · ❌ ausente · — não
 
 | Área | Estado | Observação |
 |---|---|---|
+| **0. Exigências do domínio** | | |
 | 1. Produto & escopo | | |
 | 2. Decisões registradas (ADR) | | |
 | 3. Repo, tooling & CI | | |
@@ -26,7 +30,15 @@ Legenda: ✅ existe · ⚠️ parcial ou não seguido · ❌ ausente · — não
 | 7. Dados & configuração | | |
 | 8. Operação & segurança | | |
 
-### Detalhe das lacunas
+### Exigências do domínio
+
+_O que este tipo de projeto precisa e nenhuma régua genérica encontraria._
+
+| Exigência | Estado | Evidência | Custo de deixar como está |
+|---|---|---|---|
+| | | | |
+
+### Detalhe das lacunas (régua genérica)
 
 | Item | Estado | Evidência | Custo de deixar como está |
 |---|---|---|---|

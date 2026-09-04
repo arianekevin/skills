@@ -31,23 +31,48 @@ A skill detecta sozinha em qual dos dois casos você está:
 /alicerce
 ```
 
-**Projeto novo.** Faz no máximo cinco perguntas, em uma rodada só, com opções para marcar.
-A que mais importa é o **horizonte**: protótipo descartável, produto interno ou produção — é ela que
-calibra o que é essencial. Protótipo com fundação de produção é desperdício; produto com fundação de
-protótipo é dívida. Sai um `docs/PLANO-FUNDACAO.md` dividido em três ondas, cabendo em 1–2 dias.
+Antes de qualquer coisa, ela quer saber **o que é o projeto** — em texto livre, nunca em múltipla
+escolha. É a cancela: sem essa frase, não escreve plano. Um software financeiro com integração
+bancária e um site pessoal compartilham talvez 40% da fundação, e a diferença é justamente o que
+importa.
 
-**Projeto existente.** Lê o repositório e uma feature real ponta a ponta, marca a régua de oito áreas
-com ✅ ⚠️ ❌ —, e escreve um `docs/DIAGNOSTICO-FUNDACAO.md` com plano priorizado. O achado mais útil
+```
+/alicerce quero fazer um software financeiro com IA e integrações com grandes bancos
+```
+
+Dessa frase ela deriva as **exigências do domínio** — decimal em vez de float, trilha de auditoria
+imutável, idempotência em toda operação que move dinheiro, camada de tradução por banco, avaliação
+rotulada para a parte de IA. Nada disso está numa lista de boas práticas genérica, e tudo isso encosta
+no modelo de dados, que é o retrofit mais caro que existe.
+
+**Projeto novo.** Com o domínio na mão, faz no máximo quatro perguntas de calibragem, em uma rodada
+só, com opções para marcar — e não pergunta o que o domínio já respondeu. A que mais importa é o
+**horizonte**: protótipo descartável, produto interno ou produção. Protótipo com fundação de produção
+é desperdício; produto com fundação de protótipo é dívida. Sai um `docs/PLANO-FUNDACAO.md` em três
+ondas, cabendo em 1–2 dias.
+
+**Projeto existente.** Infere o domínio do código e confirma em uma linha, lê o repositório e uma
+feature real ponta a ponta, marca a régua de oito áreas com ✅ ⚠️ ❌ —, e escreve um
+`docs/DIAGNOSTICO-FUNDACAO.md` com plano priorizado. Sistema financeiro guardando dinheiro em float é
+o tipo de achado que só aparece porque ela olhou o domínio primeiro. O achado mais útil
 raramente é o ❌: é o ⚠️ — o CI que só roda lint, o README cujos comandos não rodam mais, o token de
 design com cor hardcoded em metade dos componentes. Por isso a régua manda **verificar na prática**,
 nunca pela presença do arquivo.
 
-**A régua (`references/checklist-fundacao.md`):** produto e não-escopo · decisões registradas (ADR) ·
-repo, tooling e CI · convenções e estrutura · design system · documentação viva · dados e
-configuração · operação e segurança. Cada item traz prioridade e o sinal de detecção no repo.
+**A régua (`references/checklist-fundacao.md`)** é o piso comum: produto e não-escopo · decisões
+registradas (ADR) · repo, tooling e CI · convenções e estrutura · design system · documentação viva ·
+dados e configuração · operação e segurança. Cada item traz prioridade e o sinal de detecção no repo.
+Sobre ela se somam as exigências de `references/dominio.md` — famílias de domínio (regulado,
+integração pesada, IA no núcleo, consumidor, B2B multi-tenant, dados) e o que a combinação de duas
+cria que nenhuma delas pediria sozinha.
 
 **O que ela garante:**
 
+- **A stack é justificada pelo domínio, não por gosto.** "Decimal nativo porque lida com dinheiro",
+  não "porque é uma linguagem moderna".
+- **A feature de referência exercita o domínio.** Num financeiro com integração bancária, "importar um
+  extrato e conciliar uma linha" vale dez vezes mais que "cadastro de usuário" — prova a camada de
+  tradução, a idempotência, o decimal e a auditoria de uma vez.
 - **A ordem segue custo de reversão, não estética.** Migration versionada, forma de erro, tokens e
   modelo de permissão são baratos no dia 1 e caros no dia 90 — por isso vêm antes.
 - **Design system em camadas, nessa ordem.** Tokens → primitivos → padrões. Componente bonito sem
