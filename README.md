@@ -82,6 +82,11 @@ passar.
 - **Testes nascem antes da primeira linha de código de produto.** Não porque testar é virtuoso: o
   custo do primeiro teste é fixo e desproporcional, e código escrito sem teste não é testável. No dia
   100 você não escreve teste, você desmonta código pra conseguir escrever.
+- **Postura de produto antes da fundação.** Se a IA é o produto — e não uma capacidade entre outras —
+  a fundação muda: toda capacidade vira ferramenta nomeada, o domínio precisa ser alcançável sem
+  passar pela tela, e o contexto passa a carregar dois atores, a pessoa e o agente. O teste é direto:
+  *se a tela sumisse amanhã, a IA continuaria capaz de fazer a mesma coisa?* Se não, ela é camada
+  sobre a UI, não produto.
 - **Toda feature sai com tour, e a âncora é a metade cara.** O tour aponta para um elemento; sem um
   identificador próprio no componente, sobra ancorar em classe de CSS ou posição, que quebram no
   primeiro refactor e quem descobre é o usuário. Pôr âncora depois é passar por todo componente de

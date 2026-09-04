@@ -12,6 +12,10 @@ essas escolhas são da obra e viram ADR em `docs/adr/`._
 **Horizonte:** {protótipo descartável / produto interno / produção}
 **Quem toca:** {solo / time de N}
 **Modo de especificação:** {genérico / personalizado}
+**Postura de produto:** {a IA é o produto / a IA é uma capacidade / sem IA}
+
+{Se a IA é o produto, escrever aqui o que isso significa neste projeto e a resposta ao
+teste: se a tela sumisse amanhã, a IA continuaria capaz de fazer a mesma coisa?}
 
 ### Não-escopo
 - {o que este projeto explicitamente NÃO faz}
