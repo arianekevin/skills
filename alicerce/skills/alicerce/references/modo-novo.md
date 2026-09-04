@@ -26,11 +26,6 @@ como suposição no documento — corrigir lendo é mais barato que responder.
 | 2 | Natureza: web app / API / CLI / mobile / lib | liga ou desliga áreas inteiras |
 | 3 | Stack: já decidida, ou derivo do domínio? | muda tooling e estrutura |
 | 4 | Quem toca: só você, ou time? | peso de `CONTRIBUTING`, CI, revisão |
-| 5 | A IA é o produto, é uma capacidade, ou não entra? | muda o desenho inteiro — ver `dominio.md` |
-
-A **5** só vira pergunta se a frase do projeto não deixou claro, e a casa pode já ter
-resposta: se o `CLAUDE.md` global do dev declara a postura (ex.: "todo projeto novo é
-AI-first"), **adote e diga que adotou**, sem perguntar.
 
 A **1** é a mais importante e a mais esquecida. Se só puder fazer uma, faça essa.
 
@@ -71,9 +66,6 @@ para código que será jogado fora.
 | Protótipo descartável | **nenhuma por padrão** — só a que o dev confirmar |
 | Produto interno | as que encostam no modelo de dados. As demais, adiadas |
 | Produção | a lista inteira |
-
-Postura de produto **não** é cortada pelo horizonte: se a IA é o produto, ela é o
-produto também no protótipo — o que muda é a profundidade, não a natureza.
 
 **Duas coisas o horizonte nunca corta**, porque o custo de retrofitá-las cresce com o
 tamanho do código e não com a ambição do projeto:

@@ -127,38 +127,6 @@ A Onda 2 deve integrar **um** parceiro ponta a ponta e virar o molde dos outros.
 
 ### IA no núcleo do produto 🔬
 
-**Primeiro decida a postura**, porque ela muda a fundação inteira:
-
-| Postura | O que significa |
-|---|---|
-| **A IA é o produto** | tela, API e banco são consequência. As exigências desta seção são todas P0 |
-| **A IA é uma capacidade** | um recurso entre outros. Vale a tabela de baixo, não a de cima |
-| **Não entra** | escreva `N/A` e siga |
-
-#### Quando a IA é o produto
-
-| Exigência | O que quebra sem ela | Onde é imposta |
-|---|---|---|
-| **Toda capacidade do produto é ferramenta nomeada** — nome, entrada, efeito, permissão | a IA só consegue fazer o que a tela já fazia, porque foi construída por cima dela | catálogo versionado |
-| **O domínio é alcançável sem passar pela camada de entrega** | a IA vira roteirista de UI: frágil, lenta, e quebra a cada mudança de tela | regra de dependência |
-| **O contexto carrega dois atores: a pessoa e o agente** | não se separa o que a pessoa fez do que a IA fez em nome dela — a primeira pergunta quando algo dá errado | assinatura de função |
-| **Cada capacidade declara se lê, escreve ou exige confirmação humana** | a IA executa ação irreversível que ninguém autorizou | catálogo + registro da confirmação |
-| **Custo por ação, atribuível a tenant e a usuário** | o custo do produto é invisível até a fatura chegar | registro por chamada |
-
-**O teste que separa produto de enfeite:** *se a tela sumisse amanhã, a IA continuaria
-capaz de fazer a mesma coisa?* Se não, a IA é camada por cima da UI, não produto — e o
-modo de falhar mais comum não é pensar pouco em IA, é entregar chat na frente das telas
-que já existiam.
-
-Repare que esse teste não pede nada novo: é a regra de dependência levada a sério. A
-tela é **um** cliente do domínio, o agente é outro, e nenhum dos dois é o dono.
-
-A dos dois atores é a família de auditoria levada a sério: com IA no produto, "quem fez"
-deixa de ser um campo e vira dois — *a IA, em nome de fulano*. Retrofitar isso é o mesmo
-refactor transversal de sempre, agora sobre código que já assumia um ator só.
-
-#### Em qualquer postura
-
 Stack: ver a skill/doc de API do provedor antes de fixar modelo e preço — nunca de memória.
 
 | Exigência | Pri | Por que |
