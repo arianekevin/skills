@@ -28,6 +28,28 @@ Não importa o que o dev peça — nesta fase, você não gera correções. Se o
 
 > "Antes de corrigir, vamos garantir que entendemos a causa raiz. Me conta: você já conseguiu reproduzir o bug?"
 
+### Padrões comuns
+
+Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir — pergunta, procedência,
+escrita fora do repositório e saída honesta. Duas têm agravante aqui:
+
+**Procedência.** Confirme todo identificador na fonte antes de citá-lo:
+
+```bash
+grep -rn "<nome>" --include=*.java --include=*.xml --include=*.sql .
+ls src/main/resources/db/migration | grep -i <entidade>
+```
+
+E no CRM a ausência engana mais que em outros lugares: é **multi-tenant e o Flyway roda
+manual, por tenant**. "Essa tabela não existe" pode ser base errada, tenant sem a
+migration aplicada, ou schema diferente. Antes de concluir a partir de uma ausência,
+estabeleça **em qual base você olhou** — ausência não localizada não derruba nem
+sustenta hipótese nenhuma.
+
+**Pergunta.** O relato inicial do sintoma é aberto por natureza. Daí em diante quase
+tudo é enumerável — qual das hipóteses, qual arquivo, qual cenário, qual tenant — e
+enumerável vira escolha para marcar, com candidatos reais do código.
+
 ### Fluxo de investigação
 
 Siga este roteiro de perguntas, adaptando conforme o contexto. Não despeje todas de uma vez — vá uma por uma, como uma conversa.
@@ -42,7 +64,20 @@ git log --all --oneline --grep='<NomeDaEntidade>'
 git log --all --oneline -S'<ClasseDaExcecao>' -- <arquivo do topo da pilha>
 ```
 
-Complete com a triagem básica: versão da base do cliente (o bug pode já estar corrigido em release mais nova), e busca no YouTrack pelo sintoma.
+Complete com a triagem básica: busca no YouTrack pelo sintoma, e a **versão**.
+
+**Diagnostique sempre contra a versão mais recente.** Se nada nela indicar o bug, não
+conclua "não é bug" — confira se a **versão anterior** carregava o problema. As duas
+saídas são diferentes e você precisa saber em qual está:
+
+| Versão atual | Versão anterior | Conclusão |
+|---|---|---|
+| sem o bug | com o bug | **já corrigido** — identifique em qual release e diga ao dev |
+| sem o bug | sem o bug | **INCONCLUSIVO** — você não encontrou, não é "não existe" |
+| com o bug | — | segue a investigação normal |
+
+Sem esse par, "não achei nada" vira ambíguo e o dev não sabe se fecha o ticket ou se
+insiste.
 
 **Busque por assinatura técnica, não por nome de tela.** Exceção + entidade + método. O mesmo bug aparece em telas diferentes com tickets diferentes.
 
@@ -92,6 +127,8 @@ Complete com a triagem básica: versão da base do cliente (o bug pode já estar
 - Explicar como uma parte do framework funciona (Struts actions lifecycle, AngularJS digest, etc.)
 - Sugerir pontos de log temporário para confirmar hipóteses
 - Ajudar a montar cenários de reprodução
+- Ler tickets do YouTrack e cruzar com o histórico do repositório
+- Escrever a query que o dev vai rodar quando você não tem acesso à base
 
 ### O que você NÃO pode fazer
 
@@ -99,18 +136,44 @@ Complete com a triagem básica: versão da base do cliente (o bug pode já estar
 - Alterar arquivos do projeto
 - Propor refatorações
 - Fazer commit ou abrir PR
+- **Escrever no YouTrack** — comentar, mudar estado, atribuir ou abrir ticket. Ler é o uso previsto; qualquer escrita só com pedido explícito do dev, naquela sessão
+- Citar nome de tabela, coluna ou entidade que você não verificou na fonte
 
-## Quando considerar o diagnóstico concluído
+## Como o diagnóstico termina
 
-O diagnóstico está completo quando o dev consegue responder estas três perguntas:
+São **duas** saídas legítimas. Fechar como diagnosticado sem ter a causa raiz não é
+uma delas — e é o que acontece quando a única saída disponível é a de sucesso.
+
+### DIAGNOSTICADO
+
+Quando as três perguntas estão respondidas:
 
 1. **O que acontece?** (sintoma claro e reproduzível)
 2. **Por que acontece?** (causa raiz em uma frase)
 3. **Quais cenários são afetados?** (pelo menos 2 casos de teste definidos)
 
-Quando essas três estiverem respondidas, diga ao dev:
-
 > "O diagnóstico está completo. Você tem a causa raiz e os cenários de teste. Agora você pode usar a skill de bugfix (bug-guardrail) para planejar e implementar a correção com apoio de IA."
+
+### INCONCLUSIVO
+
+Quando falta evidência que você não consegue obter sozinho. **Não é falha do processo,
+é o resultado honesto** — e evita a pior saída de todas, que é uma causa raiz
+plausível e errada virando correção.
+
+Inconclusivo **sempre carrega um motivo**, e a ausência do dado é o motivo — não um
+estado separado. Entregue três coisas:
+
+1. **Até onde chegou** — o que ficou estabelecido com evidência, e o que caiu
+2. **Qual dado falta**, nomeado: "quantas linhas em `X` com `status=Y` no tenant Z"
+3. **Como obter** — a query pronta pra rodar, o log pra olhar, o cenário pra reproduzir
+
+> "Inconclusivo: não consegui acessar a base do cliente. Descartei A e B por evidência
+> no código. Para decidir entre C e D preciso do resultado desta query: `<query>`.
+> Roda e me manda que eu fecho o diagnóstico."
+
+Sem a base disponível, o fluxo degrada exatamente pro que você já faz hoje — a IA
+escreve a query, você roda e cola. Não é modo capenga, é o processo normal parando
+onde o dado acaba.
 
 ## Tom e postura
 

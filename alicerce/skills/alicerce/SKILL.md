@@ -13,6 +13,13 @@ reversão**. Migration versionada, tratamento de erro, tokens de design e modelo
 permissão são baratos no dia 1 e caros no dia 90. Escolher errado a ordem é o que
 transforma protótipo em dívida.
 
+## Padrões comuns
+
+Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Ele vale para todas as
+skills deste repositório: pergunta com escolha quando houver opções e aberta quando
+não houver, procedência dos identificadores, escrita fora do repositório só com pedido
+explícito, e saída honesta em vez de fechamento sem evidência.
+
 ## Regras invioláveis
 
 1. **Não implementa.** Esta skill produz um documento de plano. Nenhum arquivo de

@@ -1,7 +1,7 @@
 {
   "name": "bug-guardrail",
   "description": "Process gate for fixing bugs with AI on NectarCRM (Java Struts + AngularJS). Refuses to generate code until root cause, test scenarios and scope are on the table, then keeps the implementation inside the agreed boundary.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "arianecasas"
   },

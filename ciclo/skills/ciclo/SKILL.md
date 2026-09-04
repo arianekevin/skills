@@ -16,6 +16,13 @@ Isso existe porque loop sem critério vira espiral: a IA muda algo, não mede, m
 desfaz a primeira, e trinta minutos depois o repositório está pior e ninguém sabe o que foi tentado.
 O que impede isso não é esforço — é o indicador medido a cada volta e o diário do que já falhou.
 
+## Padrões comuns
+
+Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Ele vale para todas as
+skills deste repositório: pergunta com escolha quando houver opções e aberta quando
+não houver, procedência dos identificadores, escrita fora do repositório só com pedido
+explícito, e saída honesta em vez de fechamento sem evidência.
+
 ## Os três insumos
 
 Nada começa sem os três. Eles são o contrato do loop.

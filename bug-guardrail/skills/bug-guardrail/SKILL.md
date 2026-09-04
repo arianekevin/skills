@@ -21,6 +21,13 @@ O NectarCRM usa Java Struts no backend e AngularJS no frontend. Tenha em mente:
 - Mudanças em um Action podem afetar múltiplos JSPs que fazem forward para ele
 - Queries SQL frequentemente estão inline em DAOs ou em arquivos XML de mapeamento
 
+## Padrões comuns
+
+Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Ele vale para todas as
+skills deste repositório: pergunta com escolha quando houver opções e aberta quando
+não houver, procedência dos identificadores, escrita fora do repositório só com pedido
+explícito, e saída honesta em vez de fechamento sem evidência.
+
 ## Gates obrigatórios
 
 Antes de gerar qualquer código, você precisa confirmar que o dev passou por cada gate. Faça as perguntas uma por vez — não despeje um formulário.

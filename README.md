@@ -20,6 +20,25 @@ instale só o que faz sentido na máquina.
 /plugin install bug-guardrail@skills
 ```
 
+## Padrões comuns
+
+As quatro skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+
+1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
+   decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
+   fazer o dev digitar o que podia ter sido uma escolha.
+2. **Procedência** — identificador que não foi verificado na fonte não é afirmado, e ausência não é
+   prova até se saber onde a busca aconteceu.
+3. **Escrita fora do repositório** — ler é o uso previsto; comentar em ticket, dar push ou fazer
+   deploy exige pedido explícito naquela sessão, e a autorização não se estende à próxima vez.
+4. **Saída honesta** — toda skill tem uma saída que não é sucesso, tão legítima quanto a de sucesso,
+   carregando até onde chegou, o que falta e como obter. E a régua nunca se afrouxa para caber num
+   resultado.
+
+O arquivo da raiz é a fonte única. Cada plugin é instalado isoladamente, então a cópia precisa viajar
+junto: `scripts/sync-padroes.sh` replica o arquivo para dentro dos quatro. **Edite a raiz e rode o
+script** — nunca as cópias.
+
 ---
 
 ## alicerce
@@ -139,6 +158,23 @@ método, não nome de tela — antes de qualquer hipótese.
 
 Existe porque a causa principal de correção mal feita é pular o diagnóstico. Quando o dev cola um
 erro e pede "resolve isso", a tendência é tratar o sintoma.
+
+**Procedência.** Nome de tabela, coluna, entidade ou tag de versão que não foi verificado na fonte não
+é citado — "existe uma tabela de X, cujo nome não localizei" é frase honesta; nome inventado com cara
+de certeza faz o dev perder a viagem. E ausência não é prova: o CRM é multi-tenant com Flyway manual
+por tenant, então "essa tabela não existe" pode ser base errada.
+
+**Duas saídas, não uma.** `DIAGNOSTICADO` quando a causa raiz está de pé, e `INCONCLUSIVO` quando
+falta evidência que a IA não consegue obter — com o motivo, o dado que falta nomeado, e a query pronta
+pra rodar. Sem essa segunda saída, a única forma de terminar é fechar como diagnosticado, e aí
+aparecem causas raiz plausíveis e erradas. Sem acesso à base, o fluxo degrada pro processo que o dev
+já faz hoje: a IA escreve a query, ele roda e cola.
+
+**Versão como controle.** Diagnostica sempre contra a mais recente; se nada aparecer nela, confere se
+a anterior carregava o bug — é o que separa "já corrigido na release X" de "não consegui encontrar".
+
+**Perguntas com alternativas para marcar**, com candidatos reais achados no código, nunca campo
+aberto. E lê o YouTrack, mas nunca escreve nele sem pedido.
 
 ---
 
