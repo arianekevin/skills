@@ -1,115 +1,118 @@
-# Modo AUDITORIA — o que existe vs. o que falta
+# Modo AUDITORIA — o que existe contra o que deveria existir
 
-Objetivo: produzir `docs/DIAGNOSTICO-FUNDACAO.md` com lacunas priorizadas e um plano.
+Objetivo: `docs/DIAGNOSTICO-FUNDACAO.md`, com as lacunas priorizadas e um plano que a
+`obra` — ou o dev — consiga executar. Você não corrige nada aqui.
 
-## 1. Levantar o terreno (antes de julgar)
+## 1. Levantar o terreno
 
 ```bash
 ls -A
 git log --oneline | wc -l ; git log -1 --format=%cr
-find . -path ./node_modules -prune -o -type f -name '*.md' -print | head -20
+ls README.md CLAUDE.md CONTRIBUTING.md docs/PLANO-FUNDACAO.md docs/adr 2>/dev/null
 ls .github/workflows .gitlab-ci.yml 2>/dev/null
-ls docs docs/adr 2>/dev/null
 cat .gitignore 2>/dev/null | head
 ```
 
-Depois identifique stack e forma de `src/`, e leia o `README` e **uma** feature
-representativa ponta a ponta. Uma feature real diz mais sobre as convenções vigentes
-que qualquer documento — inclusive quando contradiz o documento.
+Identifique a stack e a forma de `src/`, leia o `README` e **uma feature representativa
+ponta a ponta**. Uma feature real diz mais sobre as convenções vigentes que qualquer
+documento — inclusive quando o contradiz.
 
-**Não leia o repo inteiro.** Para repos grandes, delegue o levantamento ao agente
+Não leia o repositório inteiro. Em repositório grande, delegue o levantamento ao agente
 `Explore` com a régua em mãos e trabalhe sobre o retorno.
 
-## 2. Nomear o domínio (e confirmar)
+## 2. Nomear o domínio, e confirmar
 
-Antes de julgar qualquer coisa, diga em uma frase o que o projeto **é** — inferido do
-README, dos nomes das entidades e das dependências. Confirme em uma linha:
+Diga em uma frase o que o projeto **é**, inferido do README, das entidades e das
+dependências. Confirme em uma linha antes de julgar qualquer coisa:
 
 > "Entendi como {um X que faz Y para Z}. Corrijo alguma coisa antes de eu avaliar?"
 
-Com o domínio na mão, leia `dominio.md` e derive as exigências dele. Elas entram na
-auditoria como uma **área 0**, avaliada com o mesmo ✅ ⚠️ ❌ das outras oito.
-
-É aqui que a auditoria fica útil de verdade: um sistema financeiro guardando dinheiro
-em float é um achado grave que **nenhuma régua genérica encontraria** — não há item
-"não use float" numa lista de boas práticas.
-
-Duas verificações que valem o tempo em qualquer sistema que guarda dado de valor,
-porque são as que mais viram gambiarra de fim de projeto:
-
-```bash
-# o ator chega na camada que grava, ou o domínio não sabe quem chamou?
-grep -rnE "(void|public).*(save|update|persist|merge)\(" --include=*.java src | head -20
-# escrita destrutiva nas entidades centrais
-grep -rniE "\b(update|delete) +(from +)?[a-z_]+ +set|\.remove\(|\.delete\(" src | head -20
-```
-
-Se as assinaturas de escrita não carregam ator e não há log escrito num ponto único,
-registre como ⚠️ grave **mesmo que exista uma tabela de auditoria** — tabela sem ator
-confiável é auditoria que não responde a pergunta que se faz a ela. E diga no
-documento o que já é irrecuperável: o histórico anterior não volta, o padrão vale
-daqui pra frente.
+Com o domínio, leia `dominio.md` e derive as exigências. Elas entram como **área 0**,
+avaliadas junto das outras. É aqui que a auditoria fica útil: um sistema financeiro
+guardando dinheiro em float é um achado grave que **nenhuma régua genérica encontraria**
+— não existe item "não use float" numa lista de boas práticas.
 
 ## 3. Marcar a régua
-
-Percorra `checklist-fundacao.md` e classifique cada item:
 
 | Marca | Significado |
 |---|---|
 | ✅ | existe e funciona |
 | ⚠️ | existe, mas parcial, desatualizado ou não seguido na prática |
 | ❌ | ausente |
-| — | não se aplica a este projeto |
+| — | não se aplica (e isso vai **escrito**) |
 
-⚠️ é a marca mais informativa. Casos típicos: CI que só roda lint e não roda teste;
-README cujos comandos não rodam mais; tokens definidos mas com cor hardcoded em
-metade dos componentes; `CONTRIBUTING` descrevendo uma estrutura que o código
-abandonou. **Verifique na prática, não pela presença do arquivo.**
+⚠️ é a marca mais informativa, e a mais comum em projeto real: CI que só roda lint,
+README cujos comandos não rodam mais, tokens definidos com cor literal em metade dos
+componentes, `CONTRIBUTING` descrevendo uma estrutura que o código abandonou.
 
-Teste barato de ⚠️: o arquivo existe, mas o código o contradiz? Então é ⚠️, não ✅.
+**Verifique na prática, não pela presença do arquivo.** O arquivo existe mas o código o
+contradiz? É ⚠️, não ✅.
 
-## 4. Priorizar as lacunas
+### A verificação que mais rende: onde a regra é imposta
 
-Ordene por **custo de retrofit crescente ao longo do tempo**, não por facilidade.
-Uma lacuna sobe de prioridade quando:
+Para cada regra que o projeto **diz** ter, descubra quem a impõe de fato. A tabela
+denuncia sozinha:
 
-- **Bloqueia outras** — sem CI, nenhuma outra convenção se sustenta
-- **Fica exponencialmente mais cara** — tokens, a11y, migrations, permissão: o custo
-  cresce com o número de arquivos que já violam o padrão
-- **Já está sangrando** — tem bug ou retrabalho recorrente atribuível a ela
-- **É exigência do domínio** — quase sempre entra na frente de item da régua genérica,
-  porque encosta no modelo de dados e não na configuração
+| Regra declarada | Diz que é imposta em | Realmente é |
+|---|---|---|
+| | | |
 
-Desce de prioridade quando é aditiva e de custo constante (CHANGELOG, CODEOWNERS):
-custa o mesmo hoje ou daqui a um ano, então pode esperar.
+Armadilhas reais, encontradas em auditoria de projeto:
 
-Nomeie explicitamente as lacunas **que já não vale a pena corrigir** por completo —
-um projeto de 3 anos sem migration versionada não vai reescrever o histórico; ele
-adota a partir de agora. Marque como "adotar daqui pra frente".
+- Trigger `FOR EACH ROW` bloqueia `UPDATE` e `DELETE` mas **não pega `TRUNCATE`**
+- Visão com junção interna **esconde** a linha órfã em vez de denunciá-la — o registro
+  existe na tabela e some da tela, sem erro
+- Invariante garantido só pela transação do app: qualquer escrita fora dele o quebra
+- Regra que existe só na documentação, sem lint, teste ou constraint atrás
 
-## 5. Plano de implementação
+Teste os três caminhos em qualquer garantia de banco: `UPDATE`, `DELETE`, `TRUNCATE`.
+Faça as sondas dentro de `begin; ... rollback;` — auditoria não altera dado.
 
-Três ondas, cada item com esforço estimado (P ≤1h / M ≤meio dia / G >1 dia):
+**Regra que não declara onde é imposta é desejo.** Procure também as regras
+**implícitas**: invariantes que o código depende e que ninguém escreveu. Costumam ser as
+mais frágeis, justamente porque nunca foram enunciadas.
 
-- **Onda 1 — o que destrava o resto.** CI, tooling, `.env.example`. Sempre P ou M.
-- **Onda 2 — o que fica mais caro a cada semana.** Tokens, migration, forma de erro,
-  modelo de permissão. Inclui as adoções "daqui pra frente".
-- **Onda 3 — o aditivo.** Docs, ADRs retroativos dos porquês que ninguém lembra mais.
+## 4. Priorizar
 
-Para cada item G, quebre em passos ou proponha uma versão mínima. "Migrar 40
-componentes para tokens" não é item de plano; "criar tokens + migrar os 5
-componentes mais usados" é.
+Ordene por **custo de retrofit crescente**, não por facilidade. Sobe quem:
+
+- **Bloqueia outras** — sem estrutura de teste, nenhuma diretriz de qualidade se sustenta
+- **Fica exponencialmente mais cara** — testes, tokens, a11y, migrations, ator na
+  assinatura: o custo cresce com o número de arquivos que já violam o padrão
+- **Já está sangrando** — bug ou retrabalho recorrente atribuível a ela
+- **É exigência do domínio** — encosta no modelo de dados, não na configuração
+
+Desce quem é aditivo e de custo constante: `CHANGELOG`, `CODEOWNERS`. Custa o mesmo
+hoje ou daqui a um ano.
+
+## 5. Os baldes
+
+Mesmo formato do modo NOVO, mais um balde que só existe aqui:
+
+- **Obrigatório** — com onde deve ser imposto e critério verificável
+- **Opcional** — com o sinal que o tornaria necessário
+- **Adiado de propósito** — com gatilho
+- **Adotar daqui pra frente** — a lacuna que não vale corrigir retroativamente
+- **Não se aplica** — escrito
+
+O quarto balde é o que torna a auditoria executável. Projeto de três anos não reescreve
+histórico de migration, e projeto sem teste no dia 100 não ganha teste em tudo — isso
+ninguém faz. O que funciona é *"toda mudança nova sai com teste"*. Diga isso
+explicitamente em vez de listar uma dívida que ninguém vai pagar.
+
+Para cada item grande, quebre em passos ou proponha a versão mínima. "Migrar 40
+componentes para tokens" não é item de plano; "criar a escala e migrar os 5 componentes
+mais usados" é.
 
 ## 6. Escrever e reportar
 
-Preencha `assets/DIAGNOSTICO.template.md` em `docs/DIAGNOSTICO-FUNDACAO.md`.
-
-No terminal, mostre **só**: o domínio como você o entendeu, o placar por área, os 3
-itens da Onda 1, e o que marcou como "não vale mais corrigir". O documento tem o resto.
+Preencha `assets/DIAGNOSTICO.template.md`. No terminal mostre **só**: o domínio como
+você o entendeu, o placar por área, os três primeiros itens e o que caiu em "adotar
+daqui pra frente".
 
 ## Tom
 
-Este é um diagnóstico, não um julgamento. Projeto rodando em produção sem ADR não é
-projeto ruim — é projeto que priorizou entrega. Relate a lacuna e o custo dela; a
-decisão de pagar ou não é do dev. Evite adjetivo, use consequência: não "o setup está
-fraco", e sim "sem teste no CI, uma regressão só aparece em produção".
+Diagnóstico, não julgamento. Projeto rodando em produção sem ADR não é projeto ruim — é
+projeto que priorizou entrega. Relate a lacuna e a consequência dela; pagar ou não é
+decisão do dev. Evite adjetivo, use consequência: não "o setup está fraco", e sim "sem
+teste no CI, uma regressão só aparece em produção".

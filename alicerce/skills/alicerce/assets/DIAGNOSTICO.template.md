@@ -21,14 +21,26 @@ Legenda: ✅ existe · ⚠️ parcial ou não seguido · ❌ ausente · — não
 | Área | Estado | Observação |
 |---|---|---|
 | **0. Exigências do domínio** | | |
+| **Contrato de fundação** (os 5 documentos) | | |
 | 1. Produto & escopo | | |
 | 2. Decisões registradas (ADR) | | |
 | 3. Repo, tooling & CI | | |
 | 4. Convenções & estrutura | | |
-| 5. Design system | | |
-| 6. Documentação viva | | |
-| 7. Dados & configuração | | |
-| 8. Operação & segurança | | |
+| 5. Testes | | |
+| 6. Design system | | |
+| 7. Documentação viva | | |
+| 8. Dados & configuração | | |
+| 9. Operação & segurança | | |
+
+### Onde cada regra é imposta
+
+_A verificação que mais rende: para cada regra que o projeto **diz** ter, quem a impõe
+de fato. Inclua as regras implícitas — invariantes que o código depende e ninguém
+enunciou; costumam ser as mais frágeis._
+
+| Regra declarada | Diz que é imposta em | Realmente é |
+|---|---|---|
+| | | |
 
 ### Exigências do domínio
 
@@ -67,6 +79,22 @@ Esforço: **P** ≤1h · **M** ≤meio dia · **G** >1 dia
 | # | O que fazer | Esforço | Pronto quando |
 |---|---|---|---|
 | 1 | | | |
+
+---
+
+## Baldes
+
+### Obrigatório
+| # | Requisito | Onde deve ser imposto | Pronto quando |
+|---|---|---|---|
+
+### Opcional
+| # | Requisito | Passa a valer a pena quando |
+|---|---|---|
+
+### Não se aplica
+| Área | Por quê |
+|---|---|
 
 ---
 

@@ -1,102 +1,120 @@
-# Modo NOVO — planejar o passo 0
+# Modo NOVO — especificar a fundação
 
-Objetivo: em ~10 minutos de conversa, produzir `docs/PLANO-FUNDACAO.md` executável.
+Objetivo: produzir os cinco documentos do contrato, com uma seção que a `obra` consiga
+executar sem tomar decisão estrutural nem perguntar a cada passo.
 
-## 1. Perguntar (uma rodada só, máximo 5)
+Você não escreve código. Se der vontade de criar um arquivo de configuração, pare: o
+que você tem a fazer é **descrever o requisito** com precisão suficiente para a `obra`
+criá-lo sozinha.
 
-Use `AskUserQuestion` **uma vez**, com as perguntas abaixo. Não faça segunda rodada —
-o que faltar, você assume e registra como suposição no documento.
+## 1. O domínio já está na mão
 
-Antes de perguntar, **elimine as que já sabe**. Se o dev já disse "app web em Next",
-não pergunte a natureza nem a stack. Perguntar o que já foi dito queima confiança.
+Você cumpriu o Passo 0: tem a frase do projeto. Leia `dominio.md`, passe pelo filtro
+("isso é dor de fundação?") e derive de 2 a 5 exigências, cada uma com **o que quebra
+sem ela** e **onde é imposta**.
+
+Isso já responde muita coisa — não pergunte o que o domínio respondeu.
+
+## 2A. Caminho genérico — 4 perguntas, uma rodada
+
+Use `AskUserQuestion` **uma vez**. O que não for perguntado, você assume e registra
+como suposição no documento — corrigir lendo é mais barato que responder.
 
 | # | Pergunta | Por que é decisiva |
 |---|---|---|
-| 1 | O que é o projeto e pra quem? (uma frase) | define escopo e não-escopo |
-| 2 | Natureza: web app / API / CLI / mobile / lib / script | liga ou desliga áreas inteiras da régua |
-| 3 | Stack — já decidida ou quer sugestão? | muda tooling, CI e estrutura |
-| 4 | Quem toca: só você, ou time? | define peso de CONTRIBUTING, CI, CODEOWNERS |
-| 5 | Horizonte: protótipo descartável, produto interno, ou vai pra produção? | calibra o que é P0 |
+| 1 | Horizonte: protótipo descartável, produto interno, ou produção? | calibra o que é obrigatório |
+| 2 | Natureza: web app / API / CLI / mobile / lib | liga ou desliga áreas inteiras |
+| 3 | Stack: já decidida, ou derivo do domínio? | muda tooling e estrutura |
+| 4 | Quem toca: só você, ou time? | peso de `CONTRIBUTING`, CI, revisão |
 
-A **5** é a mais importante e a mais esquecida. Protótipo descartável com fundação de
-produto é desperdício; produto com fundação de protótipo é dívida. Se só puder fazer
-uma pergunta, faça essa.
+A **1** é a mais importante e a mais esquecida. Se só puder fazer uma, faça essa.
 
-Ofereça opções concretas em cada pergunta, não campo aberto. O dev responde em
-15 segundos em vez de escrever um parágrafo.
+Nestas quatro, ofereça opções concretas — o dev marca em quinze segundos.
 
-## 3. Calibrar pelo horizonte
+## 2B. Caminho personalizado — rodadas curtas, com freio
 
-| Horizonte | O que vira P0 |
+Mesmo ponto de partida, mesmas quatro acima primeiro. A diferença é o que vem depois.
+
+**Só vira pergunta o que satisfaz as duas condições:**
+
+1. Muda o **conjunto de arquivos** ou o **ponto de imposição** de alguma regra
+2. **Não** dá pra derivar do domínio somado ao horizonte
+
+Todo o resto continua vindo do default e aparece no documento como *"assumido, não
+perguntado"*. Se você está prestes a perguntar algo que a régua já responde igual em
+99% dos projetos, não pergunte — escreva a suposição.
+
+Perguntas que costumam passar no teste: onde o dado de cada cliente mora (linha, schema
+ou banco); se a regra X é imposta pelo banco ou por revisão; se CI entra agora; se o
+histórico é derivado ou guardado; qual é a feature de referência.
+
+Perguntas que **não** passam: nome de pasta, estilo de aspas, qual runner de teste.
+
+Pare quando a próxima pergunta não mudar nenhum dos cinco documentos. Diga que parou:
+
+> "Fechei o que muda o desenho. O resto eu assumi — está tudo na seção de suposições."
+
+## 3. O horizonte corta a lista do domínio
+
+Passo obrigatório nos dois caminhos. As duas calibragens são independentes e **podem se
+contradizer**: o domínio pede trilha append-only, o horizonte "protótipo descartável"
+pede quase nada. Sem corte explícito você obedece as duas e entrega fundação de produto
+para código que será jogado fora.
+
+| Horizonte | Sobra das exigências do domínio |
 |---|---|
-| Protótipo descartável | README + tokens + `.gitignore`. Só. Nada de CI, ADR ou migration |
-| Produto interno | os P0 da régua, sem CD nem observabilidade fina |
-| Produção | régua P0 inteira + healthcheck + modelo de permissão |
+| Protótipo descartável | **nenhuma por padrão** — só a que o dev confirmar |
+| Produto interno | as que encostam no modelo de dados. As demais, adiadas |
+| Produção | a lista inteira |
 
-Não empurre fundação de produção num protótipo. É o erro simétrico de não ter
-fundação nenhuma, e custa igual.
+**Duas coisas o horizonte nunca corta**, porque o custo de retrofitá-las cresce com o
+tamanho do código e não com a ambição do projeto:
 
-### O horizonte corta a lista do domínio — passo obrigatório
+- **A estrutura de teste**, incluindo o teste da feature de referência (área 5 da régua)
+- **O ator na assinatura de quem grava**, quando o projeto guarda dado de valor
 
-As duas calibragens são independentes e **podem se contradizer**: o domínio pede
-trilha append-only e ator até a camada que grava; o horizonte "protótipo descartável"
-pede README e nada mais. Sem um corte explícito, você obedece as duas e entrega
-fundação de produto para código que vai ser jogado fora.
-
-Antes de escrever o plano, cruze as duas listas:
-
-| Horizonte | O que sobra das exigências do domínio |
-|---|---|
-| Protótipo descartável | **Nenhuma por padrão.** Só entra a que o dev confirmar |
-| Produto interno | As P0 que encostam no modelo de dados. As demais, adiadas |
-| Produção | A lista inteira |
-
-Se alguma exigência do domínio parecer boa demais para cortar num protótipo — e às
-vezes é, porque append-only muda o modelo de dados e retrofitar é caro —, **diga isso
-em voz alta e deixe o dev decidir**:
+Se alguma outra exigência parecer boa demais para cortar, **diga em voz alta e deixe o
+dev decidir**:
 
 > "Você marcou protótipo descartável, então por regra eu cortaria o histórico
-> append-only. Mas ele muda o modelo de dados e é o item mais caro de acrescentar
-> depois. Mantenho, ou corto e a gente aceita perder o histórico se isso virar
-> produto?"
+> append-only. Mas ele muda o modelo de dados e é o mais caro de acrescentar depois.
+> Mantenho, ou corto e a gente aceita perder o histórico se isso virar produto?"
 
-O que não pode é entregar em silêncio o oposto do que a calibragem pediu. Se o dev
-mandar manter, registre no plano que a exigência **contraria o horizonte declarado**,
-com a justificativa — assim, quem ler depois entende por que um protótipo tem trigger
-de banco.
+Se o dev mandar manter, registre no plano que a exigência **contraria o horizonte
+declarado**, com a justificativa. Quem ler depois entende por que um protótipo tem
+trigger de banco.
 
-## 4. Montar o plano
+## 4. Montar os três baldes
 
-Junte duas listas: as exigências derivadas do domínio (passo 1) e a régua genérica —
-percorra `checklist-fundacao.md` marcando cada item como **entra / N/A / adiado**.
-Depois agrupe em três ondas por dependência:
+Junte as exigências do domínio (já cortadas) com a régua de `checklist-fundacao.md`,
+e classifique **cada item** em um balde:
 
-- **Onda 1 — esqueleto (algumas horas).** Repo, tooling, CI verde, `.env.example`,
-  README mínimo, ADRs iniciais. Nada de feature. Termina com CI verde no commit 1.
-- **Onda 2 — o eixo (meio dia).** Estrutura de pastas, convenções, tokens de design,
-  migration inicial, forma de erro e log — **mais as exigências P0 do domínio**, que
-  quase sempre caem aqui porque encostam no modelo de dados. Termina com **uma feature
-  de referência** ponta a ponta, fina mas atravessando todas as camadas.
-- **Onda 3 — o resto.** Primitivos de UI, seed, CONTRIBUTING, CHANGELOG.
+- **Obrigatório** — com onde é imposto e critério de pronto verificável por comando
+- **Opcional** — com o sinal que o tornaria necessário
+- **Adiado de propósito** — com o gatilho de revisita, e o detector quando a máquina
+  puder checar a divergência
+- **Não se aplica** — escrito, nunca omitido
 
-A feature de referência da Onda 2 é o entregável mais valioso do plano inteiro:
-ela vira o template que todo o resto copia, humano ou IA. Escolha a mais fina que
-ainda atravesse todas as camadas — e que **exercite a exigência central do domínio**.
-Num financeiro com integração bancária, "importar um extrato de um banco e conciliar
-uma linha" vale dez vezes mais que "cadastro de usuário": prova a camada de tradução,
-a idempotência, o decimal e a trilha de auditoria de uma vez.
+As **fases** continuam existindo, como ordem de execução para a `obra`:
 
-## 5. Escrever
+- **Fase 1 — esqueleto.** Repo, tooling, config, estrutura de teste com o teste que
+  exercita a stack de verdade. Zero feature
+- **Fase 2 — o eixo.** Estrutura de pastas, regra de dependência, forma de erro, tokens,
+  as exigências P0 do domínio, e a **feature de referência com o teste dela**
+- **Fase 3 — o resto.** Primitivos, cadastros copiando o molde, documentação final
 
-Preencha `assets/PLANO-FUNDACAO.template.md` em `docs/PLANO-FUNDACAO.md`.
-Gere também `docs/adr/0000-template.md` a partir de `assets/adr-0000.template.md` —
-é o único arquivo além do plano que esta skill cria.
+A feature de referência é o entregável mais valioso: vira o molde que todos copiam,
+humano ou IA. A mais fina que ainda atravesse todas as camadas e exercite a exigência
+central do domínio.
 
-Cada item do plano precisa de: **o que fazer**, **por que agora** (uma linha),
-e **como saber que está pronto**. Item sem critério de pronto vira item eterno.
-Nos itens vindos do domínio, o "por que agora" cita o domínio explicitamente.
+## 5. Escrever os cinco documentos
 
-Escreva os ADRs iniciais como **títulos com a decisão já tomada** quando ela for
-óbvia pelas respostas ("0001 — Usar Postgres"), e como pergunta em aberto quando não
-for ("0004 — Modelo de autenticação: a decidir"). Não invente decisão que o dev
-não tomou.
+Modelos em `assets/`. Regras que valem para todos:
+
+- **Requisito, nunca ferramenta ou versão.** A escolha é da `obra` e vira ADR lá
+- **O que ficar pendente vai escrito como pendente**, dizendo quem preenche
+- **Cada regra declara quem a impõe** — inclusive "acordo", quando for o caso
+
+Nos ADRs iniciais, escreva como decisão tomada o que a conversa decidiu ("0002 — Banco
+relacional") e como pergunta em aberto o que ela não decidiu ("0004 — Autenticação: a
+decidir"). Nunca invente decisão que o dev não tomou.

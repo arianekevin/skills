@@ -12,6 +12,24 @@ por que agora, pronto quando. E precisa dizer **por que este projeto** precisa d
 
 ---
 
+## O filtro: isso é dor de fundação?
+
+Nem toda dor da casa vira item daqui. O teste é: **se o projeto tivesse começado
+diferente, essa dor existiria?**
+
+- **Sim** → é fundação. Nasceu de decisão de dia 1 que ficou cara. Ex.: auditoria sem
+  ator na assinatura, código sem costura de teste, multi-tenancy decidida tarde
+- **Não** → é operação ou diagnóstico, e pertence a outra skill. Ex.: cliente rodando
+  versão antiga, investigar bug sem acesso à base, dois frontends herdados
+
+Sem o filtro, a régua incha com dor verdadeira que ela não tem como resolver — e um
+plano genérico é ruído. Quando o dev contar uma dor nova, passe por aqui primeiro, e
+diga em qual dos dois lados ela caiu.
+
+Uma dor pode ainda **confirmar prioridade sem acrescentar item**: se ela já está na
+régua, a contribuição é subir a prioridade e escrever o exemplo real, não criar linha
+nova.
+
 ## Como derivar
 
 Três perguntas sobre a frase do projeto:
@@ -38,21 +56,26 @@ ator vira variável de thread, ou `SecurityContext` alcançado do fundo da camad
 dados, ou parâmetro empurrado por trinta assinaturas. Nenhuma dessas saídas é boa, e
 todas custam mais que ter decidido no dia 1.
 
-Por isso as três primeiras linhas abaixo são sobre **gravar**. A tela de auditoria,
-retenção, export para regulador, encadeamento de hash e diff por campo são software
-normal — construa quando alguém pedir, com o formato que a pessoa pedir. Construir
-antes é adivinhar.
+Por isso as linhas abaixo são sobre **gravar**. A tela de auditoria, retenção, export
+para regulador, encadeamento de hash e diff por campo são software normal — construa
+quando alguém pedir, com o formato que a pessoa pedir. Construir antes é adivinhar.
 
-| Exigência | Pri | Por que não dá pra deixar pra depois |
+E repare na coluna da direita: **garantia que mora na transação do app não é garantia**.
+Duas armadilhas reais, encontradas em auditoria de projeto: uma trigger `FOR EACH ROW`
+não pega `TRUNCATE`, e uma visão com junção interna **esconde** a linha órfã em vez de
+denunciá-la. Toda exigência que diz "imposta pelo banco" precisa ser testada nos três
+caminhos — `UPDATE`, `DELETE` e `TRUNCATE`.
+
+| Exigência | O que quebra sem ela | Onde é imposta |
 |---|---|---|
-| **Nunca float para dinheiro** — decimal com escala e moeda explícitas | P0 | trocar o tipo depois é migrar todo o histórico |
-| **Ator disponível na camada que grava** — "quem fez" atravessa a cadeia de chamada | P0 | enfiar o ator nas assinaturas depois é refactor transversal em todo serviço, job e teste |
-| **Nada de `UPDATE`/`DELETE` destrutivo nas entidades centrais** — append-only, ou tabela de log genérica escrita num **único** ponto (trigger, interceptor, middleware) | P0 | não se reconstrói o passado que não foi gravado |
-| **ADR: saldo é derivado de lançamentos, não armazenado mutável** | P0 | contabilidade não muta saldo, acrescenta lançamento — e a auditoria vem junto de graça |
-| **Idempotência em toda operação que move dinheiro** | P0 | sem chave de idempotência, retry vira cobrança dupla |
-| **Modelo de dados com estado e origem**, não só saldo | P0 | conciliação exige saber de onde cada centavo veio |
-| Classificação de dado pessoal + mascaramento em log (LGPD) | P0 | log com dado sensível já vazou quando você descobre |
-| Ambiente de homologação com credenciais sandbox separadas | P1 | |
+| **Nunca float para dinheiro** — decimal com escala e moeda explícitas | centavo errado que só aparece no total, quando já não dá pra saber de onde veio; trocar o tipo depois é migrar todo o histórico | tipo + coluna do banco |
+| **Ator disponível na camada que grava** | a auditoria não responde "quem fez"; enfiar o ator nas assinaturas depois é refactor transversal em todo serviço, job e teste | assinatura de função — não compila sem |
+| **Nada de `UPDATE`/`DELETE` destrutivo nas entidades centrais** — append-only, ou log genérico escrito num **único** ponto | não se reconstrói o passado que não foi gravado | banco (constraint ou trigger), **cobrindo também `TRUNCATE`** |
+| **ADR: saldo derivado de lançamentos, não armazenado mutável** | log e saldo discordam e ninguém sabe qual mente | modelo de dados: a coluna mutável não existe |
+| **Idempotência em toda operação que move dinheiro** | retry vira cobrança dupla | chave única no banco |
+| **Todo registro central nasce com seu evento** | linha sem evento some da visão derivada, em silêncio | banco — não a transação do app |
+| Classificação de dado pessoal + mascaramento em log | log com dado sensível já vazou quando você descobre | revisão / lint |
+| Ambiente de homologação com credenciais separadas | teste toca dado real | config |
 
 ### Integração pesada com terceiros (bancos, ERPs, gateways, operadoras)
 
@@ -133,3 +156,16 @@ a justificativa tem que ser persistida junto da decisão.
 
 Ao combinar, diga isso no plano explicitamente. É o tipo de item que ninguém lembra de
 pedir e todo mundo cobra depois.
+
+---
+
+## Acrescentando uma dor nova
+
+O melhor conteúdo deste arquivo veio do dev contando o **mecanismo** da falha, não a
+categoria. "Auditoria é importante" não gera item nenhum; *"é armazenar e não mostrar, e
+vira gambiarra no fim do projeto"* gera três, porque tem um item de dia 1 escondido
+dentro.
+
+Ao ouvir uma dor nova, pergunte pelo mecanismo — como quebra na prática — e depois
+passe pelo filtro do topo deste arquivo. Só então escreva a linha, sempre com as duas
+colunas: **o que quebra sem ela** e **onde é imposta**.

@@ -43,85 +43,54 @@ script** — nunca as cópias.
 
 ## alicerce
 
-O documento que deveria existir antes da primeira linha de código — e que quase nunca existe.
-A skill detecta sozinha em qual dos dois casos você está:
-
-```
-/alicerce
-```
-
-Antes de qualquer coisa, ela quer saber **o que é o projeto** — em texto livre, nunca em múltipla
-escolha. É a cancela: sem essa frase, não escreve plano. Um software financeiro com integração
-bancária e um site pessoal compartilham talvez 40% da fundação, e a diferença é justamente o que
-importa.
+A especificação que deveria existir antes da primeira linha de código. **Ela não implementa nada** —
+escreve documentos. Quem levanta o projeto é a `obra`, lendo o que a alicerce especificou.
 
 ```
 /alicerce quero fazer um software financeiro com IA e integrações com grandes bancos
 ```
 
-Dessa frase ela deriva as **exigências do domínio** — decimal em vez de float, trilha de auditoria
-imutável, idempotência em toda operação que move dinheiro, camada de tradução por banco, avaliação
-rotulada para a parte de IA. Nada disso está numa lista de boas práticas genérica, e tudo isso encosta
-no modelo de dados, que é o retrofit mais caro que existe.
+Antes de tudo ela quer saber **o que é o projeto**, em texto livre, nunca em múltipla escolha. É a
+cancela: sem essa frase, não escreve nada. Um software financeiro com integração bancária e um site
+pessoal compartilham talvez 40% da fundação, e a diferença é justamente o que importa.
 
-**Projeto novo.** Com o domínio na mão, faz no máximo quatro perguntas de calibragem, em uma rodada
-só, com opções para marcar — e não pergunta o que o domínio já respondeu. A que mais importa é o
-**horizonte**: protótipo descartável, produto interno ou produção. Protótipo com fundação de produção
-é desperdício; produto com fundação de protótipo é dívida. Sai um `docs/PLANO-FUNDACAO.md` em três
-ondas, cabendo em 1–2 dias.
+**Dois caminhos, mesmo documento no fim.** O *genérico* faz quatro perguntas e a régua preenche o
+resto. O *personalizado* abre rodadas curtas — mas só pergunta o que muda o conjunto de arquivos ou o
+ponto de imposição de alguma regra, e que não dá pra derivar do domínio somado ao horizonte. O modo
+muda quanto o dev decide, não a cara do resultado.
 
-**Projeto existente.** Infere o domínio do código e confirma em uma linha, lê o repositório e uma
-feature real ponta a ponta, marca a régua de oito áreas com ✅ ⚠️ ❌ —, e escreve um
-`docs/DIAGNOSTICO-FUNDACAO.md` com plano priorizado. Sistema financeiro guardando dinheiro em float é
-o tipo de achado que só aparece porque ela olhou o domínio primeiro. O achado mais útil
-raramente é o ❌: é o ⚠️ — o CI que só roda lint, o README cujos comandos não rodam mais, o token de
-design com cor hardcoded em metade dos componentes. Por isso a régua manda **verificar na prática**,
-nunca pela presença do arquivo.
-
-**A régua (`references/checklist-fundacao.md`)** é o piso comum: produto e não-escopo · decisões
-registradas (ADR) · repo, tooling e CI · convenções e estrutura · design system · documentação viva ·
-dados e configuração · operação e segurança. Cada item traz prioridade e o sinal de detecção no repo.
-Sobre ela se somam as exigências de `references/dominio.md` — famílias de domínio (regulado,
-integração pesada, IA no núcleo, consumidor, B2B multi-tenant, dados) e o que a combinação de duas
-cria que nenhuma delas pediria sozinha.
+**Projeto existente** entra em auditoria: infere o domínio e confirma, lê uma feature real ponta a
+ponta, e a verificação que mais rende é descobrir, para cada regra que o projeto diz ter, quem a impõe
+de fato — foi assim que apareceu uma trigger que bloqueava `UPDATE` e `DELETE` e deixava `TRUNCATE`
+passar.
 
 **O que ela garante:**
 
-- **A stack é justificada pelo domínio, não por gosto.** "Decimal nativo porque lida com dinheiro",
-  não "porque é uma linguagem moderna".
-- **A feature de referência exercita o domínio.** Num financeiro com integração bancária, "importar um
-  extrato e conciliar uma linha" vale dez vezes mais que "cadastro de usuário" — prova a camada de
-  tradução, a idempotência, o decimal e a auditoria de uma vez.
-- **A ordem segue custo de reversão, não estética.** Migration versionada, forma de erro, tokens e
-  modelo de permissão são baratos no dia 1 e caros no dia 90 — por isso vêm antes.
-- **Design system em camadas, nessa ordem.** Tokens → primitivos → padrões. Componente bonito sem
-  escala de espaçamento por trás é sinal de que começaram pelo fim.
-- **"Adiado de propósito" é seção obrigatória**, com o gatilho de revisita. Microserviços, i18n,
-  cache, feature flags. Transforma "esquecemos" em "decidimos".
-- **"Adotar daqui pra frente".** Na auditoria, nomeia a lacuna que não vale corrigir retroativamente —
-  projeto de três anos não reescreve histórico de migration, adota o padrão para código novo.
-- **Adota a convenção da casa.** Lê o `CLAUDE.md` e projetos vizinhos antes de propor qualquer padrão.
-  Consistência entre projetos vale mais que a escolha ótima em um.
-- **Diagnóstico, não julgamento.** Relata a consequência da lacuna, não adjetivo. Projeto em produção
-  sem ADR não é projeto ruim — é projeto que priorizou entrega.
+- **Requisito, nunca ferramenta.** "Formatter e linter num tool só, rodando em CI" é do plano; "Biome
+  2.5" é da obra, e vira ADR lá. Plano que cita versão nasce velho — e erra, porque quem não executa
+  não tem como conferir.
+- **Cada regra declara quem a impõe** — banco, tipo, lint, CI, hook ou *acordo*. Regra que não declara
+  é desejo, e escrever "imposta por: acordo" é honesto; esconder não é.
+- **Contrato de fundação fixo:** cinco arquivos em caminhos fixos com seções de título fixo, sempre
+  presentes. O horizonte calibra a profundidade, nunca a existência — num protótipo, um ADR de três
+  linhas ainda é um ADR onde se espera encontrá-lo.
+- **`N/A` se escreve.** Área que não se aplica aparece dizendo isso. Ausência é ambiguidade, e é ela
+  que quebra o "sei o que procurar em qualquer projeto".
+- **O horizonte corta a lista do domínio** — sem esse corte você recebe fundação de produto para
+  código que vai ser jogado fora. Duas coisas ele nunca corta: a estrutura de teste e o ator na
+  assinatura de quem grava.
+- **Testes nascem antes da primeira linha de código de produto.** Não porque testar é virtuoso: o
+  custo do primeiro teste é fixo e desproporcional, e código escrito sem teste não é testável. No dia
+  100 você não escreve teste, você desmonta código pra conseguir escrever.
+- **Design system é estrutura, não inventário.** Escala de tokens com nomes semânticos, os quatro
+  estados, alvo de toque como token, nenhuma cor literal em componente. Nada de prever vinte
+  componentes: seis saem errados e oito nunca são usados.
+- **Adiar é decisão, com gatilho** — e adiado que a máquina poderia checar vem com o detector junto,
+  para não virar silêncio.
 
-- **O horizonte corta a lista do domínio.** As duas calibragens podem se contradizer — "protótipo
-  descartável" pede README e nada mais, o domínio pede trilha append-only. Sem corte explícito, você
-  recebe fundação de produto para código que vai ser jogado fora. Quando a exigência for boa demais
-  para cortar, ela pergunta em vez de decidir sozinha, e registra no plano o que foi mantido contra a
-  calibragem.
-
-**Limites:** não implementa nada. Escreve o plano e pergunta se você quer executar a Onda 1 — a
-execução é um pedido seu, item por item. Os únicos arquivos que cria são o documento e o template
-de ADR.
-
-**Na execução**, se você mandar executar: não encosta em processo, porta ou container fora do projeto
-(mata por PID guardado, nunca por padrão de nome); ferramenta que resiste duas vezes tem o default
-adotado, porque tooling de Onda 1 não pode virar o projeto; cada onda fecha com uma tabela de
-verificação onde cada linha traz o comando que a provou; e todo desvio do plano volta para o
-documento, que é vivo.
-
----
+**Limites:** não escreve código, não instala nada, não sobe serviço, não toca em porta ou container.
+Todos os problemas que uma auditoria encontrou na versão anterior vinham da execução; ela não executa
+mais.
 
 ## ciclo
 

@@ -1,6 +1,8 @@
 # Plano de Fundação — {NOME DO PROJETO}
 
-_Gerado em {DATA}. Documento vivo: atualize conforme as ondas forem concluídas._
+_Especificado em {DATA} pela skill `alicerce`. Quem implementa é a `obra`, lendo a
+seção **Requisitos para a obra**. Este documento não nomeia ferramenta nem versão:
+essas escolhas são da obra e viram ADR em `docs/adr/`._
 
 ## O projeto
 
@@ -9,6 +11,7 @@ _Gerado em {DATA}. Documento vivo: atualize conforme as ondas forem concluídas.
 **Natureza:** {web app / API / CLI / mobile / lib}
 **Horizonte:** {protótipo descartável / produto interno / produção}
 **Quem toca:** {solo / time de N}
+**Modo de especificação:** {genérico / personalizado}
 
 ### Não-escopo
 - {o que este projeto explicitamente NÃO faz}
@@ -18,119 +21,97 @@ _Gerado em {DATA}. Documento vivo: atualize conforme as ondas forem concluídas.
 
 ### O que este domínio exige
 
-_Derivado de `references/dominio.md`. São as exigências que a régua genérica não tem —
-e normalmente as mais caras de deixar pra depois, porque encostam no modelo de dados._
+**Família(s):** {ex.: financeiro/regulado + IA no núcleo}
 
-**Família(s):** {ex.: financeiro/regulado + IA no núcleo + integração com terceiros}
-
-| Exigência | Por que ESTE projeto precisa | Onda |
-|---|---|---|
-| | | |
-
-**Cortadas pelo horizonte:** {exigências que o domínio pedia e o horizonte descartou}
-**Mantidas contra o horizonte:** {as que o dev decidiu manter mesmo contrariando a
-calibragem, com a justificativa — para quem ler depois entender por que um protótipo
-tem, por exemplo, trigger de banco}
-
-**Da combinação:** {o que a interseção dos domínios cria e nenhum deles sozinho pediria}
-
-### Suposições assumidas
-- {o que não foi perguntado e foi assumido — corrija aqui se estiver errado}
-
----
-
-## Decisões iniciais (ADR)
-
-| # | Decisão | Justificada pelo domínio | Status |
-|---|---|---|---|
-| 0001 | {ex.: Stack} | {ex.: decimal nativo, lida com dinheiro} | decidida / a decidir |
-| 0002 | {ex.: Banco — Postgres} | | |
-| 0003 | {ex.: Autenticação} | | |
-
-Registrar em `docs/adr/`, formato em `docs/adr/0000-template.md`.
-
----
-
-## Onda 1 — esqueleto  ⏱️ {estimativa}
-
-_Objetivo: CI verde no primeiro commit. Zero feature._
-
-| # | O que fazer | Por que agora | Pronto quando |
-|---|---|---|---|
-| 1 | | | |
-
-## Onda 2 — o eixo  ⏱️ {estimativa}
-
-_Objetivo: uma feature de referência ponta a ponta, atravessando todas as camadas._
-
-| # | O que fazer | Por que agora | Pronto quando |
-|---|---|---|---|
-| 1 | | | |
-
-**Feature de referência escolhida:** {qual, por que atravessa todas as camadas, e qual
-exigência central do domínio ela exercita}
-
-## Onda 3 — o resto  ⏱️ {estimativa}
-
-| # | O que fazer | Por que agora | Pronto quando |
-|---|---|---|---|
-| 1 | | | |
-
----
-
-## Convenções
-
-**Estrutura:** {eixo escolhido + esboço de `src/`}
-**Regra de dependência:** {ex.: domínio não importa infra}
-**Commits:** {ex.: Conventional Commits}
-**Branches:** {ex.: trunk-based, PR obrigatório}
-
----
-
-## Verificação por onda
-
-_Preenchido ao fim de cada onda. Cada linha traz o comando que provou. O que não foi
-rodado entra como **não verificado**, nunca como feito._
-
-### Onda 1
-
-| Item | Comando | Resultado |
-|---|---|---|
-| | | |
-
-### Onda 2
-
-| Item | Comando | Resultado |
-|---|---|---|
-| | | |
-
-### Onda 3
-
-| Item | Comando | Resultado |
-|---|---|---|
-| | | |
-
----
-
-## Desvios do plano
-
-_Onde a realidade contrariou o plano, e o que foi feito no lugar. Este documento é
-vivo: plano que só descreve o dia 1 vira ficção na primeira semana._
-
-| Onda | O plano dizia | O que aconteceu | O que ficou no lugar |
+| Exigência | O que quebra sem ela | Onde é imposta | Balde |
 |---|---|---|---|
 | | | | |
 
+**Cortadas pelo horizonte:** {as que o domínio pedia e o horizonte descartou}
+**Mantidas contra o horizonte:** {as que o dev decidiu manter mesmo contrariando a
+calibragem, com a justificativa}
+**Da combinação de domínios:** {o que a interseção cria e nenhum pediria sozinho}
+
+### Suposições assumidas
+_Assumido, não perguntado. Corrigir aqui é mais barato que ter respondido._
+- {}
+
 ---
 
-## Adiado de propósito
+## Requisitos para a obra
 
-| Item | Revisitar quando |
+_Esta é a seção que a skill `obra` executa. Cada item traz o requisito (nunca a
+ferramenta), quem impõe a regra, e o critério de pronto verificável por comando._
+
+### Obrigatório
+
+| # | Fase | Requisito | Onde é imposto | Pronto quando |
+|---|---|---|---|---|
+| 1 | 1 | | | |
+
+### Opcional
+
+| # | Requisito | Passa a valer a pena quando |
+|---|---|---|
+| 1 | | |
+
+### Adiado de propósito
+
+| # | Adiado | Gatilho de revisita | Detector, se a máquina puder checar |
+|---|---|---|---|
+| 1 | | | |
+
+### Não se aplica
+
+| Área | Por quê |
 |---|---|
 | | |
 
 ---
 
-## Não se aplica
+## Fases
 
-{áreas da régua marcadas N/A e por quê}
+**Fase 1 — esqueleto.** {objetivo}. Zero feature.
+**Fase 2 — o eixo.** {objetivo}. Termina com a feature de referência e o teste dela.
+**Fase 3 — o resto.** {objetivo}.
+
+**Feature de referência:** {qual, por que atravessa todas as camadas, e qual exigência
+central do domínio ela exercita}
+
+---
+
+## Decisões (ADR)
+
+| # | Decisão | Justificada por | Status |
+|---|---|---|---|
+| 0001 | | | decidida / a decidir pela obra |
+
+Registrar em `docs/adr/`, formato em `docs/adr/0000-template.md`.
+**Escolha de ferramenta e versão é da obra** — cada uma vira um ADR novo lá.
+
+---
+
+## Verificação por fase
+_Preenchido pela `obra`. Cada linha traz o comando que provou. O que não foi rodado
+entra como **não verificado**, nunca como feito._
+
+### Fase 1
+| Item | Comando | Resultado |
+|---|---|---|
+
+### Fase 2
+| Item | Comando | Resultado |
+|---|---|---|
+
+### Fase 3
+| Item | Comando | Resultado |
+|---|---|---|
+
+---
+
+## Desvios do plano
+_Preenchido pela `obra`. Onde a realidade contrariou a especificação, e o que ficou no
+lugar. Documento vivo: plano que só descreve o dia 1 vira ficção na primeira semana._
+
+| Fase | O plano exigia | O que aconteceu | O que ficou no lugar |
+|---|---|---|---|
