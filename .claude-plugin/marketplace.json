@@ -1,0 +1,25 @@
+{
+  "name": "skills",
+  "version": "1.0.0",
+  "description": "Skills for Claude Code: an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
+  "owner": {
+    "name": "arianecasas"
+  },
+  "plugins": [
+    {
+      "name": "ciclo",
+      "source": "./ciclo",
+      "description": "Iterative loop with a stated objective, a success criterion and a budget of turns."
+    },
+    {
+      "name": "bug-diagnostico",
+      "source": "./bug-diagnostico",
+      "description": "Bug investigation assistant for NectarCRM (Java Struts + AngularJS)."
+    },
+    {
+      "name": "bug-guardrail",
+      "source": "./bug-guardrail",
+      "description": "Process gate for fixing bugs with AI on NectarCRM (Java Struts + AngularJS)."
+    }
+  ]
+}

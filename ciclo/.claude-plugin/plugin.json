@@ -1,0 +1,19 @@
+{
+  "name": "ciclo",
+  "description": "Iterative loop with a stated objective, a success criterion and a budget of turns. Researches the repository before asking anything, hands the developer pre-filled options to tick instead of blank fields, and stops when the criterion is met, the budget runs out, or progress stalls — never when the model feels satisfied.",
+  "version": "1.0.0",
+  "author": {
+    "name": "arianecasas"
+  },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": [
+    "loop",
+    "iteration",
+    "workflow",
+    "skill",
+    "guardrail",
+    "code-quality"
+  ]
+}
