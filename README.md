@@ -82,11 +82,19 @@ passar.
 - **Testes nascem antes da primeira linha de código de produto.** Não porque testar é virtuoso: o
   custo do primeiro teste é fixo e desproporcional, e código escrito sem teste não é testável. No dia
   100 você não escreve teste, você desmonta código pra conseguir escrever.
+- **Toda feature sai com tour, e a âncora é a metade cara.** O tour aponta para um elemento; sem um
+  identificador próprio no componente, sobra ancorar em classe de CSS ou posição, que quebram no
+  primeiro refactor e quem descobre é o usuário. Pôr âncora depois é passar por todo componente de
+  uma vez — mesmo formato do ator na assinatura.
 - **Design system é estrutura, não inventário.** Escala de tokens com nomes semânticos, os quatro
   estados, alvo de toque como token, nenhuma cor literal em componente. Nada de prever vinte
   componentes: seis saem errados e oito nunca são usados.
 - **Adiar é decisão, com gatilho** — e adiado que a máquina poderia checar vem com o detector junto,
   para não virar silêncio.
+
+As famílias de domínio trazem a procedência marcada: 🔬 quando vieram de código e de dor relatada por
+quem viveu, 📚 quando são conhecimento geral não conferido. A diferença de qualidade entre as duas é
+grande, e quem lê precisa saber o quanto confiar em cada linha.
 
 **Limites:** não escreve código, não instala nada, não sobe serviço, não toca em porta ou container.
 Todos os problemas que uma auditoria encontrou na versão anterior vinham da execução; ela não executa

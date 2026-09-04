@@ -131,7 +131,34 @@ Isso é adivinhar o produto: saem vinte, seis errados e oito nunca usados.
 
 Sem interface, escreva: **"não se aplica — projeto sem interface"**.
 
-## 7. Documentação viva
+## 7. Tour de feature *(condicional: só com interface)*
+
+**Toda feature nasce com tour.** O que se especifica aqui é a estrutura — nunca a
+biblioteca e nunca o texto dos passos, que só existe quando a feature existir.
+
+| Item | Pri | Onde é imposto |
+|---|---|---|
+| **Âncora estável no componente** — identificador próprio do tour, independente de classe, estilo e hierarquia | P0 | lint ou revisão |
+| Tour definido como **dado, num lugar só** — nunca espalhado dentro dos componentes | P0 | estrutura |
+| **Versão no tour**: feature mudou, o tour reapresenta em vez de mentir | P0 | modelo de dados |
+| **Registro de quem já viu**, por usuário e por versão | P0 | modelo de dados |
+| Gatilho declarado: primeira visita, sinalizador, ou manual | P1 | — |
+| Lugar para **rever** um tour já visto | P1 | — |
+| "Feature nova sai com tour" no Definition of Done | P0 | revisão ou CI |
+
+**A âncora é a metade cara**, e é o mesmo formato do ator na assinatura: o tour aponta
+para um elemento, e se o componente não carrega um identificador **próprio do tour**, a
+única alternativa é ancorar em classe de CSS, posição ou texto — que quebram
+silenciosamente no primeiro refactor, e quem descobre é o usuário. Pôr âncora depois é
+passar por todo componente do sistema de uma vez.
+
+**O registro de quem viu é tabela**, então nasce com o schema ou não nasce: acrescentado
+depois, não há dado histórico — ou todo mundo revê tudo, ou ninguém vê nada.
+
+Sem interface, escreva **"não se aplica — projeto sem interface"**. A obrigação
+equivalente ali é comportamento documentado, que já está na área 8.
+
+## 8. Documentação viva
 
 Coberta pelo contrato (área 0). O que a régua acrescenta:
 
@@ -145,7 +172,7 @@ O traço — "entra aqui, valida ali, grava lá, erro sobe pro handler único" �
 permite uma IA entender o projeto numa passada quando ele passar de alguns milhares de
 linhas. Estrutura diz onde as coisas moram; o traço diz por onde elas passam.
 
-## 8. Dados & configuração
+## 9. Dados & configuração
 
 | Item | Pri | Onde é imposto |
 |---|---|---|
@@ -161,7 +188,7 @@ distante da causa três dias depois.
 Seed realista é o que torna o design system testável — sem ele, tudo é desenhado com
 "Lorem ipsum" e quebra com dado real.
 
-## 9. Operação & segurança
+## 10. Operação & segurança
 
 | Item | Pri | Onde é imposto |
 |---|---|---|

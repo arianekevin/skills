@@ -63,6 +63,9 @@ ferramenta), quem impõe a regra, e o critério de pronto verificável por coman
 
 ### Não se aplica
 
+_Escrito, nunca omitido. Áreas condicionais típicas: design system, tour de feature,
+migrations, integração._
+
 | Área | Por quê |
 |---|---|
 | | |

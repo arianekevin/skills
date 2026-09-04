@@ -45,7 +45,41 @@ Três perguntas sobre a frase do projeto:
 
 ## Famílias
 
-### Financeiro / regulado (fintech, banco, seguro, saúde, jurídico)
+**A procedência de cada família está marcada**, porque a qualidade varia muito e quem
+lê precisa saber o quanto confiar:
+
+- 🔬 **verificada** — extraída de código e de dor relatada por quem viveu. Confie
+- 📚 **geral** — conhecimento comum, não conferido contra projeto real. Trate como ponto
+  de partida e corrija quando souber mais
+
+### Serviço novo numa frota existente 🔬
+
+O caso mais comum em casa que já tem plataforma: o "projeto novo" não é greenfield, é
+mais um serviço entrando numa frota que já tem tenant, autenticação, log, mensageria e
+migrator. **A fundação aqui é quase toda de conformidade**: o serviço que erra o
+contrato da frota no dia 1 vira exceção permanente, e exceção permanente é o que
+ninguém consegue mais padronizar depois.
+
+Antes de decidir qualquer coisa, leia como dois ou três serviços vizinhos fazem. O
+padrão da casa, mesmo imperfeito, vence a escolha ótima isolada.
+
+| Exigência | O que quebra sem ela | Onde é imposta |
+|---|---|---|
+| **O tenant chega por contrato explícito e o serviço recusa quem não o traz** | serviço processa sem saber de quem é o dado | validação na borda, com erro alto |
+| **Se o contexto vive em `ThreadLocal`, o ciclo é `try/finally`** | resíduo na thread; a corretude passa a depender de o próximo escritor sempre sobrescrever | estrutura do handler |
+| **Um contexto só** — não dois mecanismos paralelos para "quem" e "de quem" | ninguém sabe qual é a fonte da verdade, e um é limpo enquanto o outro não | revisão |
+| **Autenticação: a da frota, não a quinta** | cada serviço com um jeito; nenhum portão comum | ADR citando o serviço vizinho |
+| **Healthcheck desde o dia 1** | a orquestração não sabe se subiu; reinício não acontece | deploy |
+| **`.env.example` versionado** | ninguém sobe o serviço sem perguntar | revisão |
+| **Entrar no migrator central** | o serviço vira o único cujo schema se aplica à mão | ADR |
+| Comportamento definido quando o vizinho está fora | falha em cascata pela frota | timeout e retry explícitos |
+
+Sobre o `ThreadLocal`: o argumento **não** é "alguém vai esquecer o `clear()`". É que sem
+`try/finally` a corretude depende de um detalhe não declarado — em um caso real, de o
+escritor seguinte sempre gravar os dois valores, inclusive nulos. Uma proteção acidental
+é a primeira que se perde, porque a próxima pessoa não sabe que a está mantendo.
+
+### Financeiro / regulado (fintech, banco, seguro, saúde, jurídico) 🔬
 
 Stack: linguagem com decimal nativo e tipagem forte; banco relacional, sem discussão.
 
@@ -77,7 +111,7 @@ caminhos — `UPDATE`, `DELETE` e `TRUNCATE`.
 | Classificação de dado pessoal + mascaramento em log | log com dado sensível já vazou quando você descobre | revisão / lint |
 | Ambiente de homologação com credenciais separadas | teste toca dado real | config |
 
-### Integração pesada com terceiros (bancos, ERPs, gateways, operadoras)
+### Integração pesada com terceiros (bancos, ERPs, gateways, operadoras) 📚
 
 | Exigência | Pri | Por que |
 |---|---|---|
@@ -91,21 +125,33 @@ caminhos — `UPDATE`, `DELETE` e `TRUNCATE`.
 Sinal de alerta no plano: "integrar com N bancos" onde cada banco tem protocolo próprio.
 A Onda 2 deve integrar **um** parceiro ponta a ponta e virar o molde dos outros.
 
-### IA no núcleo do produto
+### IA no núcleo do produto 🔬
 
 Stack: ver a skill/doc de API do provedor antes de fixar modelo e preço — nunca de memória.
 
 | Exigência | Pri | Por que |
 |---|---|---|
 | **Conjunto de avaliação com exemplos rotulados** desde o dia 1 | P0 | sem eval, "melhorou o prompt" é opinião; e o conjunto só se constrói com o tempo |
-| **Prompt versionado junto do código**, não em banco nem em painel | P0 | prompt solto é mudança em produção sem review |
+| **Prompt de sistema no código**; prompt de produto em banco, com migration | P0 | ver abaixo — misturar os dois é o erro |
 | Registro por chamada: modelo, tokens, custo, latência | P0 | retrofit de custo é caro e a conta chega antes |
 | Teto de custo e timeout por requisição | P0 | |
 | **Redação de dado pessoal antes de enviar ao provedor** | P0 | especialmente cruzado com domínio regulado |
 | Comportamento definido para falha e alucinação do modelo | P0 | "o modelo respondeu errado" é caminho normal, não exceção |
 | ADR do provedor + camada fina de troca (só o suficiente) | P1 | |
 
-### Consumidor / conteúdo público (site, blog, e-commerce, landing)
+**Sobre onde o prompt mora**, que é onde quase toda régua erra: depende de quem é o
+dono.
+
+- **Prompt de sistema** — escrito pelo dev, define o comportamento do produto. É
+  **código**: vive no repositório, muda por commit e passa por review
+- **Prompt de produto** — o cliente customiza. É **dado**: vive em banco, versionado por
+  migration como qualquer outro esquema
+
+O erro não é usar banco; é **misturar os dois no mesmo lugar**. Quando o prompt de
+sistema fica editável em produção junto com o do cliente, mudança de comportamento do
+produto acontece sem commit, sem review e sem histórico ligado ao código que a assume.
+
+### Consumidor / conteúdo público (site, blog, e-commerce, landing) 📚
 
 Stack: geração estática ou SSR; complexidade de backend costuma ser o erro aqui.
 
@@ -136,7 +182,7 @@ Auditoria aqui é bem mais barata que em financeiro: `updated_by` + `updated_at`
 costuma bastar por anos. Mas o ator no contexto continua sendo P0 — é a metade cara,
 e é a mesma nos dois domínios.
 
-### Dados / pipeline / ETL
+### Dados / pipeline / ETL 📚
 
 | Exigência | Pri |
 |---|---|

@@ -41,6 +41,8 @@ o handler único em W. Estrutura diz onde as coisas moram; o traço diz por onde
 - **Nenhuma cor literal dentro de componente**
 - Alvo de toque é token, não exceção avulsa
 - Toda tela que carrega dado tem os quatro estados: carregando, vazio, erro, sem permissão
+- **Todo componente que um tour aponta carrega a âncora do tour** — identificador
+  próprio, nunca classe de CSS nem posição. Feature nova sai com tour: ver `CONTRIBUTING.md`
 
 ## Erros
 

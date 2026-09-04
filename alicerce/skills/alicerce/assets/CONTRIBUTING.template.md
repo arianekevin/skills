@@ -14,6 +14,7 @@ regra. Isso é uma escolha declarada, não um esquecimento.
 | {ex.: lint e formato limpos} | {} |
 | {ex.: typecheck limpo} | {} |
 | {ex.: documentação atualizada quando o comportamento mudou} | {} |
+| {ex.: feature nova sai com tour — passos, âncoras e versão} | {} |
 
 {Se CI não existe, escrever aqui: "Não há CI neste projeto. As regras acima são acordo —
 nada as segura automaticamente. Ligar CI é o que as transforma em garantia."}
@@ -31,6 +32,20 @@ aquela pasta; se o teste dela for raso, todos os seguintes serão rasos.
 
 {Em projeto que já existia: "Não vamos escrever teste para o que já está aqui. **Toda
 mudança nova sai com teste** — é o que se adota daqui pra frente."}
+
+## Tour
+
+**Toda feature nova sai com tour.** Feature entregue sem tour não está pronta.
+
+**Onde os tours moram:** {}
+**Âncora:** {o identificador próprio do tour que os componentes carregam} — nunca
+ancore em classe de CSS, posição ou texto: quebram no primeiro refactor e quem descobre
+é o usuário.
+**Versão:** mudou o comportamento da feature, sobe a versão do tour — ele reapresenta em
+vez de ensinar o que não existe mais.
+
+{Se não houver interface: "Não se aplica — projeto sem interface. A obrigação
+equivalente é comportamento documentado."}
 
 ## Commits e revisão
 
