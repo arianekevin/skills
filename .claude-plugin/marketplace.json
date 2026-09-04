@@ -1,6 +1,6 @@
 {
   "name": "skills",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
   "owner": {
     "name": "arianecasas"

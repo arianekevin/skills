@@ -107,6 +107,12 @@ As famílias de domínio trazem a procedência marcada: 🔬 quando vieram de c�
 quem viveu, 📚 quando são conhecimento geral não conferido. A diferença de qualidade entre as duas é
 grande, e quem lê precisa saber o quanto confiar em cada linha.
 
+Ao terminar ela **oferece** a `obra` e espera — não arranca sozinha. A pausa não é cerimônia: o plano
+sai com uma seção de suposições porque corrigir lendo é mais barato que ter respondido, e é o único
+momento em que a correção ainda custa uma linha. Numa execução real o dev leu o resumo e trocou o
+projeto de desktop-first para mobile-first na mensagem seguinte; encadeamento automático teria
+levantado a fase inteira errada.
+
 **Limites:** não escreve código, não instala nada, não sobe serviço, não toca em porta ou container.
 Todos os problemas que uma auditoria encontrou na versão anterior vinham da execução; ela não executa
 mais.

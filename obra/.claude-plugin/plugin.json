@@ -1,10 +1,18 @@
 {
   "name": "obra",
   "description": "Raises a project's foundation from what the alicerce skill specified. Reads the plan's contract, chooses the tools and versions the plan deliberately left open, records each choice as an ADR, closes every phase with a verification table where each line carries the command that proved it, and stops when the mould is proven. Refuses to start without a plan, never implements what was deliberately deferred, and never touches a process, port or container outside the project.",
-  "version": "1.0.0",
-  "author": { "name": "arianecasas" },
+  "version": "1.1.0",
+  "author": {
+    "name": "arianecasas"
+  },
   "homepage": "https://github.com/arianekevin/skills",
   "repository": "https://github.com/arianekevin/skills",
   "license": "MIT",
-  "keywords": ["scaffolding", "execution", "foundation", "adr", "skill"]
+  "keywords": [
+    "scaffolding",
+    "execution",
+    "foundation",
+    "adr",
+    "skill"
+  ]
 }

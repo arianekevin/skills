@@ -125,10 +125,19 @@ preenche — nunca em branco e nunca inventado.
 Mostre no terminal **só**: os itens obrigatórios, o que foi adiado, os `N/A`, e as
 suposições que você assumiu. O documento tem o resto.
 
-Feche assim, sem oferecer execução:
+Feche oferecendo a `obra`, **sem arrancar sozinha**:
 
-> "A fundação está especificada. Quem levanta é a `obra`, lendo o
-> `docs/PLANO-FUNDACAO.md` — ela decide ferramenta e versão, e registra em ADR."
+> "A fundação está especificada. Dá uma olhada nas suposições no topo do plano — corrigir
+> agora custa uma linha, depois custa retrabalho. Quando estiver de acordo, eu chamo a
+> `obra` pra levantar."
+
+Se o dev aceitar, **invoque a skill `obra`**. Se ele corrigir alguma coisa antes,
+reescreva o trecho afetado do plano e ofereça de novo.
+
+A pausa aqui não é cerimônia: é o único momento em que corrigir uma suposição errada
+ainda é barato. Numa execução real, o dev leu o resumo e trocou o projeto de
+desktop-first para mobile-first na mensagem seguinte — encadear automático teria
+levantado a fase inteira errada.
 
 ## Adaptação ao contexto
 

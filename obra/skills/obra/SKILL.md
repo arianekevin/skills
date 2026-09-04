@@ -46,6 +46,11 @@ Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir.
 
 ### 1. Ler o contrato
 
+**Leia do disco, sempre** — inclusive quando a `alicerce` acabou de rodar nesta mesma
+conversa e você "já sabe" o que ela escreveu. O contrato é o arquivo, não a memória da
+conversa: o dev pode ter corrigido o plano depois de ler, e a versão do disco é a que
+vale.
+
 Leia o plano inteiro, e a seção **`## Requisitos para a obra`** com atenção: cada item
 traz fase, requisito, **onde é imposto** e **critério de pronto verificável por comando**.
 Esse critério é seu ponto de parada de cada item — não invente outro.
