@@ -1,7 +1,7 @@
 {
   "name": "skills",
-  "version": "2.3.0",
-  "description": "Skills for Claude Code: a project-foundation planner, an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
+  "version": "2.4.0",
+  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
   "owner": {
     "name": "arianecasas"
   },
@@ -10,6 +10,11 @@
       "name": "alicerce",
       "source": "./alicerce",
       "description": "Plans the step zero of a new project, or audits an existing one against a foundation rubric."
+    },
+    {
+      "name": "obra",
+      "source": "./obra",
+      "description": "Raises the foundation from the plan the alicerce wrote, and stops when the mould is proven."
     },
     {
       "name": "ciclo",

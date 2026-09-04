@@ -101,11 +101,30 @@ As **fases** continuam existindo, como ordem de execução para a `obra`:
   exercita a stack de verdade. Zero feature
 - **Fase 2 — o eixo.** Estrutura de pastas, regra de dependência, forma de erro, tokens,
   as exigências P0 do domínio, e a **feature de referência com o teste dela**
-- **Fase 3 — o resto.** Primitivos, cadastros copiando o molde, documentação final
+- **Fase 3 — fechar a fundação.** Só o que a completa: os primitivos que a feature de
+  referência já exigiu, o seed, e a documentação final
+
+**Nada de "mais uma feature" entra em fase nenhuma.** Feature seguinte é trabalho
+normal, feito com o `CLAUDE.md` e o molde — passa pelo modo FEATURE quando houver
+decisão a tomar, e por skill nenhuma quando não houver. Plano que lista features é plano
+que não sabe onde termina.
 
 A feature de referência é o entregável mais valioso: vira o molde que todos copiam,
 humano ou IA. A mais fina que ainda atravesse todas as camadas e exercite a exigência
 central do domínio.
+
+### O critério de saída da fundação
+
+Escreva no plano, com estas palavras:
+
+> **A fundação está pronta quando a segunda feature sai do molde sem pergunta.**
+
+A primeira feature — a de referência — não é fundação nem é trabalho normal: é a
+**prova de que o molde funciona**. Enquanto ninguém a copiou, o molde é hipótese.
+
+Isso dá à `obra` um ponto de parada verificável e diz ao dev o que esperar: se a segunda
+feature ainda exigir decisão estrutural, a fundação não terminou — falta convenção
+escrita, ou o molde não era molde.
 
 ## 5. Escrever os cinco documentos
 

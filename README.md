@@ -5,7 +5,8 @@ instale só o que faz sentido na máquina.
 
 | Plugin | O que faz | Escopo |
 |---|---|---|
-| **alicerce** | Planeja o passo 0 de um projeto novo, ou audita a fundação de um já existente | genérico |
+| **alicerce** | Especifica o passo 0 de um projeto novo, audita a fundação de um já existente, ou desenha uma feature dentro dele | genérico |
+| **obra** | Levanta a fundação a partir do plano que a alicerce escreveu | genérico |
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
@@ -15,6 +16,7 @@ instale só o que faz sentido na máquina.
 ```
 /plugin marketplace add arianekevin/skills
 /plugin install alicerce@skills
+/plugin install obra@skills
 /plugin install ciclo@skills
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills

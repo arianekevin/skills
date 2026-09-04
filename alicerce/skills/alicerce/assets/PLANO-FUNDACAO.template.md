@@ -76,10 +76,23 @@ migrations, integração._
 
 **Fase 1 — esqueleto.** {objetivo}. Zero feature.
 **Fase 2 — o eixo.** {objetivo}. Termina com a feature de referência e o teste dela.
-**Fase 3 — o resto.** {objetivo}.
+**Fase 3 — fechar a fundação.** {só o que a completa: primitivos que a feature de
+referência exigiu, seed, documentação final}.
 
 **Feature de referência:** {qual, por que atravessa todas as camadas, e qual exigência
 central do domínio ela exercita}
+
+Ela não é fundação nem trabalho normal: é a **prova de que o molde funciona**.
+
+### Critério de saída da fundação
+
+> **A fundação está pronta quando a segunda feature sai do molde sem pergunta.**
+
+Se a segunda feature ainda exigir decisão estrutural, a fundação não terminou — falta
+convenção escrita, ou o molde não era molde.
+
+**Fora do plano, de propósito:** features seguintes. Elas são trabalho normal, feitas com
+o `CLAUDE.md` e o molde. Plano que lista features é plano que não sabe onde termina.
 
 ---
 
