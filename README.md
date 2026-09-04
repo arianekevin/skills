@@ -59,6 +59,15 @@ resto. O *personalizado* abre rodadas curtas — mas só pergunta o que muda o c
 ponto de imposição de alguma regra, e que não dá pra derivar do domínio somado ao horizonte. O modo
 muda quanto o dev decide, não a cara do resultado.
 
+**Coisa nova dentro de projeto que já existe** tem modo próprio, e é o que mais previne apodrecimento.
+Projeto não apodrece por uma decisão ruim — apodrece por **convenção paralela**: duas formas de tratar
+erro, dois estilos de teste, nenhuma declarada, e ninguém consegue apontar o dia em que virou duas.
+O documento da feature tem três listas: o que ela **herda**, as **lacunas** (cada uma com decisão
+escrita — resolve local, vira convenção do projeto, ou a feature muda de desenho) e o que ela **não
+inventa**. Se a lacuna vira convenção, sobe para o `CLAUDE.md` do hospedeiro; senão são duas
+convenções para sempre. E se a coisa tem deploy e ciclo de vida próprios, ela não é feature: é
+projeto novo no mesmo repositório, e o modo é outro.
+
 **Projeto existente** entra em auditoria: infere o domínio e confirma, lê uma feature real ponta a
 ponta, e a verificação que mais rende é descobrir, para cada regra que o projeto diz ter, quem a impõe
 de fato — foi assim que apareceu uma trigger que bloqueava `UPDATE` e `DELETE` e deixava `TRUNCATE`

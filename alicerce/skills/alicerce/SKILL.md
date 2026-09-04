@@ -60,9 +60,18 @@ ls package.json pom.xml build.gradle requirements.txt pyproject.toml go.mod Carg
 ```
 
 - **NOVO** — diretório vazio, sem manifesto, ou o dev disse que vai começar
-- **AUDITORIA** — existe código-fonte com manifesto, ou histórico de commits real
+- **Projeto existe** — aí são dois modos, e a diferença é de intenção, não de disco.
+  Pergunte:
 
-Na dúvida: *"Isso é começo de projeto ou é pra evoluir o que já existe?"*
+  > "Quer que eu audite a fundação do projeto inteiro, ou especifique uma coisa nova
+  > dentro dele?"
+
+  - **AUDITORIA** — o projeto inteiro contra a régua
+  - **FEATURE** — coisa nova dentro do projeto: o que herda, o que falta, o que não
+    inventa
+
+Na dúvida sobre o primeiro corte: *"Isso é começo de projeto ou é pra evoluir o que já
+existe?"*
 
 ## Passo 2 — escolher a profundidade (só no modo NOVO)
 
@@ -85,6 +94,10 @@ Ofereça os dois **com recomendação**, baseada na frase do projeto:
 
 - **NOVO** → `references/modo-novo.md`
 - **AUDITORIA** → `references/modo-auditoria.md`
+- **FEATURE** → `references/modo-feature.md`
+
+O modo FEATURE não usa o contrato de cinco documentos: a fundação já existe, e ele
+escreve um só, `docs/features/<slug>.md`.
 
 Ambos usam `references/checklist-fundacao.md` (a régua) **depois** de `dominio.md`.
 A régua é o piso comum; o domínio é o que se soma. Plano que só tem a régua é plano que
@@ -134,4 +147,5 @@ Convenção existente vence escolha ótima. Consistência entre projetos vale ma
 - `references/checklist-fundacao.md` — a régua: o contrato, as áreas, o que é obrigatório
 - `references/modo-novo.md` — os dois caminhos e como montar a especificação
 - `references/modo-auditoria.md` — como levantar o que existe e priorizar as lacunas
+- `references/modo-feature.md` — coisa nova dentro de projeto que já existe
 - `assets/` — modelos dos cinco documentos

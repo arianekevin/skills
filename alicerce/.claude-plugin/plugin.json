@@ -1,7 +1,7 @@
 {
   "name": "alicerce",
   "description": "Project foundation planner. Detects on its own whether the repository is a fresh start or an existing project: for a fresh start it asks at most five calibrating questions and writes an executable step-zero plan; for an existing one it audits what is there against a rubric of eight areas and proposes an implementation plan ordered by how fast each gap gets more expensive. Writes documents, never code.",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "author": {
     "name": "arianecasas"
   },
