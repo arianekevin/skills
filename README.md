@@ -8,6 +8,8 @@ instale só o que faz sentido na máquina.
 | **alicerce** | Especifica o passo 0 de um projeto novo, audita a fundação de um já existente, ou desenha uma feature dentro dele | genérico |
 | **obra** | Levanta a fundação a partir do plano que a alicerce escreveu | genérico |
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
+| **pauta** | Captura a melhoria pequena do dia — ou o bug já diagnosticado — como item que um agente sem supervisão consegue executar | genérico |
+| **turno** | Executa os itens prontos de madrugada, sozinho, e deixa o relatório da manhã | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
 
@@ -18,13 +20,15 @@ instale só o que faz sentido na máquina.
 /plugin install alicerce@skills
 /plugin install obra@skills
 /plugin install ciclo@skills
+/plugin install pauta@skills
+/plugin install turno@skills
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills
 ```
 
 ## Padrões comuns
 
-As quatro skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+As sete skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
 
 1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
    decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
@@ -38,7 +42,7 @@ As quatro skills compartilham um [`PADROES.md`](PADROES.md) — as regras transv
    resultado.
 
 O arquivo da raiz é a fonte única. Cada plugin é instalado isoladamente, então a cópia precisa viajar
-junto: `scripts/sync-padroes.sh` replica o arquivo para dentro dos quatro. **Edite a raiz e rode o
+junto: `scripts/sync-padroes.sh` replica o arquivo para dentro de todos. **Edite a raiz e rode o
 script** — nunca as cópias.
 
 ---
@@ -153,6 +157,96 @@ opções pré-preenchidas com candidatos reais para marcar. Você não digita pa
 **Limites:** não commita sem pedido (e nunca com `git add -A`), nunca dá `git push`, não usa
 `git checkout` para desfazer em arquivo com trabalho não commitado, não edita migration já aplicada,
 e não sobe a aplicação.
+
+---
+
+## pauta
+
+A melhoria que você vê de passagem — "um dia eu troco todo esse texto explicativo por tooltip" — vira
+um arquivo em `docs/melhorias/`, escrito para ser executado **por um agente que não pode perguntar
+nada a ninguém**.
+
+```
+/pauta trocar os textos explicativos de Configurações por tooltips
+/pauta o filtro de período perde o último dia, é o fuso em useDateRange.ts:37
+/pauta                      # revisa o que está acumulado
+```
+
+**Os quatro testes.** Um item só vai para `pronto/` se passar nos quatro; falhou em um, vai para
+`bloqueado/` com o que falta nomeado:
+
+1. **Decisão** — nenhuma que seja sua ou do negócio. Se duas pessoas competentes pudessem discordar
+   do resultado, é decisão.
+2. **Precedente** — o padrão-alvo **já existe aplicado** em algum lugar, com caminho e linha. Este é
+   o teste que ninguém lembra e o que mais estraga noite: "melhorar para tooltips estilizadas" só é
+   autônomo depois que existe uma tooltip estilizada para copiar. Senão o agente desenha sozinho, de
+   madrugada, e você acorda com trinta arquivos num padrão que você não escolheu.
+3. **Critério** — um comando prova o pronto, normalmente uma contagem que vai a zero, medida **na
+   hora da captura**. Comando que não roda hoje na sua máquina não roda de madrugada.
+4. **Escopo** — o que pode e o que não pode tocar, mais o tamanho. Item que não cabe em cinco voltas
+   de `/ciclo` não é um item, são vários.
+
+**A pasta é o estado** (`pronto/`, `rascunho/`, `bloqueado/`, `feito/`, `relatorio/`) — estado em dois
+lugares diverge no primeiro dia. E ela é rápida de propósito: investiga sozinha com `grep`, mostra o
+item pronto e sai do caminho, porque você está no meio de outra coisa.
+
+**Bug entra também**, com dois dos quatro testes trocados: no lugar do precedente, a **causa raiz em
+uma frase com caminho e linha**, conferida na fonte — bug com causa suposta vira correção de sintoma,
+e correção de sintoma passa no teste. No lugar da contagem, a **reprodução**: os cenários escritos e
+a assinatura da falha atual colada, para o turno escrever o teste na volta 1 e provar que ele falha
+pela razão certa antes de corrigir.
+
+A triagem é o **momento**, não o assunto: quer entender o bug agora é `bug-diagnostico`, quer
+corrigir agora é `bug-guardrail`, é uma chateação pequena que já entendeu e não quer parar o dia para
+consertar é pauta. E há o que nunca entra, por reversibilidade e não por dificuldade: bug que mexe em
+dado, em cobrança, em permissão, em autenticação, que muda contrato de API, ou que não tem reprodução
+determinística.
+
+**Limites:** não edita uma linha de código, não commita, e não executa nem o item que acabou de
+escrever.
+
+---
+
+## turno
+
+O trabalho da noite. Pega os itens de `docs/melhorias/pronto/`, roda um por um numa branch só da
+noite, um commit por item, e deixa o relatório para a manhã.
+
+```
+/turno
+/turno roda os dois menores
+```
+
+**A inversão:** todas as outras skills perguntam com opções para marcar. Esta, depois do orçamento
+aprovado, **não pergunta nada** — não há ninguém para marcar. Dúvida vira item parado e registrado,
+nunca uma escolha tomada no seu lugar. Descobriu no meio que há duas formas defensáveis? O item
+falhou no teste 1 da pauta: reverte, vai para `bloqueado/` com a decisão escrita, e segue.
+
+**As cancelas, antes de qualquer coisa:** é repositório git, árvore de trabalho limpa (mexer no seu
+trabalho não commitado sem você por perto é pior que não rodar — e nada de `stash`), existe item
+pronto, e **a guarda de regressão está verde agora**. Se já estava vermelha, a noite não é dela: você
+acordaria sem saber se foi você ou ela.
+
+**O ritual de cada item**, sem atalho: conferência da âncora na fonte (o precedente, ou a causa raiz
+do bug) → baseline do critério (se já passa, item fechado sem commit) → execução pela `ciclo`, que
+recebe os três insumos já prontos do arquivo → revisão do próprio diff pela `bug-reviewer`, o único
+olho que esse código terá até de manhã → guarda de regressão inteira → conferência de escopo por
+`git status --porcelain` → commit por pathspec explícito, ou reversão. Escopo estourado é item falho
+mesmo com o critério verde.
+
+**Em item de bug há um portão a mais**, antes de qualquer correção: a volta 1 escreve o teste dos
+cenários e ele tem que falhar **com a assinatura que está no item**. Passou de cara, ou falhou por
+outro motivo, o item para — e as duas assinaturas, a esperada e a obtida, vão para o relatório. É a
+informação mais útil que a noite pode produzir sobre aquele bug. Sem esse portão, o teste escrito
+depois do fix passa por construção e não prova nada.
+
+**Para a noite inteira** com três itens falhos seguidos, guarda vermelha que não volta ao verde,
+orçamento esgotado, ou cancela que reaparece. Volta para a sua branch antes de terminar — encontrar
+de manhã uma branch que você não reconhece é o primeiro susto que ela poupa.
+
+**O relatório** abre com o veredito em números, põe o que falhou antes do que deu certo, cola a saída
+em vez de parafrasear, lista o que ela viu e **não** fez (a noite enxerga o que ninguém enxerga de
+dia), e fecha com os comandos de desfazer. Nada é publicado: sem `push`, sem PR.
 
 ---
 

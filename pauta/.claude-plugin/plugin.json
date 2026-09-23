@@ -1,0 +1,19 @@
+{
+  "name": "pauta",
+  "description": "Captures the small improvements you spot during the day and leaves each one executable by an unsupervised agent: no business decision, an existing precedent in the repo, a done-criterion proven by command, and a scope written down. Writes items — never code.",
+  "version": "1.0.0",
+  "author": {
+    "name": "arianecasas"
+  },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": [
+    "backlog",
+    "chore",
+    "autonomous",
+    "workflow",
+    "skill",
+    "guardrail"
+  ]
+}

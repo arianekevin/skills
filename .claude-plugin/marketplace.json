@@ -1,7 +1,7 @@
 {
   "name": "skills",
-  "version": "2.5.0",
-  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, and the bug diagnosis/fix pair used on NectarCRM.",
+  "version": "2.6.0",
+  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, the capture/run pair for unattended improvement work, and the bug diagnosis/fix pair used on NectarCRM.",
   "owner": {
     "name": "arianecasas"
   },
@@ -20,6 +20,16 @@
       "name": "ciclo",
       "source": "./ciclo",
       "description": "Iterative loop with a stated objective, a success criterion and a budget of turns."
+    },
+    {
+      "name": "pauta",
+      "source": "./pauta",
+      "description": "Captures a small improvement as an item an unsupervised agent can actually run."
+    },
+    {
+      "name": "turno",
+      "source": "./turno",
+      "description": "Runs the ready items overnight on a single branch, unattended, and leaves a report for the morning."
     },
     {
       "name": "bug-diagnostico",
