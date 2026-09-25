@@ -57,6 +57,7 @@ EXEMPLO PREENCHIDO — apague este bloco ao usar o molde.
 
 ---
 id: tooltips-explicativas-settings
+tipo: melhoria
 titulo: Textos explicativos de formulário viram tooltips em Configurações
 criado: 2026-09-23
 objetivo: >

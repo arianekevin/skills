@@ -66,7 +66,8 @@ Antes da fase 1, resolva as escolhas que o plano deixou abertas. Para cada uma, 
 disponível **na data**.
 
 Verifique versão e compatibilidade **antes** de fixar — não de memória. E prefira o que
-já é padrão da casa: leia dois ou três projetos vizinhos antes de trazer coisa nova.
+o dono do projeto já usa nos outros projetos dele — confirme de quem é antes de copiar
+vizinho (ver `references/decisoes.md`).
 
 ### 3. Executar fase por fase
 

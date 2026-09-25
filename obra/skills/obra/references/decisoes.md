@@ -6,9 +6,10 @@ sem saber o que já foi pesado.
 
 ## A ordem de preferência
 
-1. **O que já é padrão da casa.** Leia dois ou três projetos vizinhos antes de trazer
-   coisa nova. Consistência entre projetos vale mais que a escolha ótima em um — o dev
-   que troca de repo não deveria trocar de vocabulário
+1. **O que o dono do projeto já usa.** Leia dois ou três projetos vizinhos **do mesmo
+   dono** antes de trazer coisa nova — pasta ao lado não é casa comum; na dúvida,
+   pergunte de quem é o projeto. Entre projetos do mesmo dono, consistência vale mais
+   que a escolha ótima em um — o dev que troca de repo não deveria trocar de vocabulário
 2. **O que a stack já traz.** Dependência a menos é manutenção a menos
 3. **O que atende o requisito com menos peças.** Formatter e linter num tool só ganha de
    dois que brigam

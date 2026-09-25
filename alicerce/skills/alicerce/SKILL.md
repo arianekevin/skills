@@ -141,14 +141,16 @@ levantado a fase inteira errada.
 
 ## Adaptação ao contexto
 
-Antes de propor qualquer convenção, veja o que já é padrão da casa:
+Antes de propor qualquer convenção, veja o que o dev já adota:
 
 ```bash
 cat ~/.claude/CLAUDE.md 2>/dev/null | head -40
 ls ../*/.editorconfig ../*/.github/workflows 2>/dev/null | head
 ```
 
-Convenção existente vence escolha ótima. Consistência entre projetos vale mais.
+Os vizinhos só valem como precedente se forem do mesmo dono do projeto — pasta ao lado
+não é casa comum. Pergunte de quem é o projeto antes de importar convenção de vizinho;
+confirmado o mesmo dono, convenção existente vence escolha ótima.
 
 ## Referências
 

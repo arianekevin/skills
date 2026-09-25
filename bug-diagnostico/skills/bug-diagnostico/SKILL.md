@@ -81,7 +81,7 @@ insiste.
 
 **Busque por assinatura técnica, não por nome de tela.** Exceção + entidade + método. O mesmo bug aparece em telas diferentes com tickets diferentes.
 
-> Caso real (30/07/2026): duplicação de oportunidades num cliente. Uma sessão inteira perseguindo a causa por hipótese — cinco tentativas de reprodução local, quatro gatilhos errados. A resposta estava no repositório havia uma semana: outro ticket, mesma exceção na mesma entidade, com a causa raiz escrita no corpo do commit e o fix pronto em outro serviço. Um `git log -S'EntityExistsException'` de 30 segundos teria encerrado tudo na primeira mensagem.
+> Por que primeiro: o mesmo bug costuma já ter passado por outro ticket, com a mesma exceção na mesma entidade e a causa raiz escrita no corpo de um commit — às vezes com o fix pronto em outro serviço. Um `git log -S'<ClasseDaExcecao>'` de 30 segundos encerra o que uma sessão inteira de hipóteses e tentativas de reprodução não encerra.
 
 **Sinal de que você pulou esta etapa:** você está na terceira hipótese e nenhuma explicou o comportamento.
 

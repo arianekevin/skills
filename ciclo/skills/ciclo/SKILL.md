@@ -306,8 +306,9 @@ Sempre, mesmo em fracasso. Nesta ordem:
 5. **Se não passou:** a assinatura da falha atual e a hipótese mais promissora ainda não testada.
    Uma, a melhor — não um menu.
 
-Se algo ficou visivelmente errado ou redundante no caminho, **conserte e avise**; não deixe a
-observação pendurada como pergunta no fim do relatório, porque pergunta no fim de relatório morre.
+Se algo **dentro do escopo** ficou visivelmente errado ou redundante no caminho, **conserte e
+avise**. Fora do escopo, registre como achado no relatório — em afirmação, não em pergunta,
+porque pergunta no fim de relatório morre.
 
 ## Limites inegociáveis
 
