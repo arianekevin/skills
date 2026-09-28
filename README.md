@@ -10,6 +10,8 @@ instale só o que faz sentido na máquina.
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
 | **pauta** | Captura a melhoria pequena do dia — ou o bug já diagnosticado — como item que um agente sem supervisão consegue executar | genérico |
 | **turno** | Executa os itens prontos de madrugada, sozinho, e deixa o relatório da manhã | genérico |
+| **fechar-sessao** | Registra onde a sessão parou — feito, combinado, adiado, próximo passo — para a próxima retomar | genérico |
+| **finalizar-tarefa** | Aponta o que ainda está aberto, pede o sim e aposenta o doc de pendências da tarefa | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
 
@@ -22,13 +24,15 @@ instale só o que faz sentido na máquina.
 /plugin install ciclo@skills
 /plugin install pauta@skills
 /plugin install turno@skills
+/plugin install fechar-sessao@skills
+/plugin install finalizar-tarefa@skills
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills
 ```
 
 ## Padrões comuns
 
-As sete skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+As nove skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
 
 1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
    decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
@@ -43,7 +47,8 @@ As sete skills compartilham um [`PADROES.md`](PADROES.md) — as regras transver
 
 O arquivo da raiz é a fonte única. Cada plugin é instalado isoladamente, então a cópia precisa viajar
 junto: `scripts/sync-padroes.sh` replica o arquivo para dentro de todos. **Edite a raiz e rode o
-script** — nunca as cópias.
+script** — nunca as cópias. O mesmo vale para `compartilhado/identificar-doc.md`, que só o par
+`fechar-sessao`/`finalizar-tarefa` usa.
 
 ---
 
@@ -249,6 +254,48 @@ em vez de parafrasear, lista o que ela viu e **não** fez (a noite enxerga o que
 dia), e fecha com os comandos de desfazer. Nada é publicado: sem `push`, sem PR.
 
 ---
+
+## fechar-sessao
+
+Para a sessão que termina com trabalho pela metade. Escreve o que a próxima precisa para retomar sem
+nada desta conversa: onde paramos, o que foi feito, combinado (com o porquê) e adiado (com o gatilho
+de volta), o próximo passo, e o estado do ambiente — não commitado, não empurrado, branches locais.
+
+```
+vamos fechar essa sessão
+```
+
+**Um doc por tarefa**, em `docs/pendencias/<tarefa>.md`, com cabeçalho `tarefa`, `branch`, `escopo`.
+Duas tarefas no mesmo repo não disputam o mesmo arquivo.
+
+**O cuidado principal é não escrever no doc errado.** Antes de tocar num doc existente, ela decide se
+ele **pertence** a esta tarefa pelos sinais: a tarefa foi nomeada, a branch bate, os arquivos mexidos
+caem no escopo, o que a sessão fez era o próximo passo registrado. Dois sinais, é dele; nenhum, cria
+outro; um só, ou dois candidatos, pergunta.
+
+**Repo com doc de continuidade próprio** — o `CLAUDE.md` manda manter um, como um `CONTINUIDADE.md` —
+segue a regra do repo e não cria pendências paralelas. Para não depender de interpretar o texto, o
+`CLAUDE.md` pode declarar: `Doc de pendências: docs/CONTINUIDADE.md`.
+
+**Não commita por padrão.** Escreve e pergunta: commitar ou manter local. Código não commitado nunca
+entra junto; vai para o "estado do ambiente".
+
+## finalizar-tarefa
+
+O par da `fechar-sessao`, para quando a tarefa acabou de verdade.
+
+```
+vamos finalizar essa tarefa
+```
+
+Acha o doc da tarefa com o mesmo critério — mais estrito, porque o resultado é apagar — e aponta o que
+ainda está aberto: próximo passo não feito, adiados, push pendente, branch local. Código da tarefa não
+commitado **bloqueia**: não finaliza com trabalho solto.
+
+**Pede um sim explícito**, mesmo com tudo verde. Confirmado, remove o doc. Se o doc era commitado,
+pergunta também se commita a remoção — é o commit que guarda os adiados no `git log`, e a skill diz
+isso. Doc só local é apagado sem commit, e os adiados vão na resposta final. Doc de continuidade do
+repo nunca é apagado: o bloco da tarefa muda para a seção de fechados dele.
 
 ## bug-diagnostico
 

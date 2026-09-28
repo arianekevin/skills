@@ -1,7 +1,7 @@
 {
   "name": "skills",
-  "version": "2.6.1",
-  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, the capture/run pair for unattended improvement work, and the bug diagnosis/fix pair used on NectarCRM.",
+  "version": "2.7.0",
+  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, the capture/run pair for unattended improvement work, and the bug diagnosis/fix pair used on NectarCRM, and the session handoff pair: close a session with a resumable record, finish a task and retire it.",
   "owner": {
     "name": "arianecasas"
   },
@@ -30,6 +30,16 @@
       "name": "turno",
       "source": "./turno",
       "description": "Runs the ready items overnight on a single branch, unattended, and leaves a report for the morning."
+    },
+    {
+      "name": "fechar-sessao",
+      "source": "./fechar-sessao",
+      "description": "Leaves a resumable record of where the session stopped, in the task's own pending doc."
+    },
+    {
+      "name": "finalizar-tarefa",
+      "source": "./finalizar-tarefa",
+      "description": "Points out what is still open, asks, and retires the task's pending doc."
     },
     {
       "name": "bug-diagnostico",

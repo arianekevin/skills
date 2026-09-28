@@ -9,3 +9,11 @@ for skill in */skills/*/; do
   echo "  → $skill"
 done
 echo "PADROES.md sincronizado."
+
+# Mesma razão, para o que só um par de skills compartilha: fechar-sessao e finalizar-tarefa
+# decidem do mesmo jeito se um doc de pendências pertence à tarefa. Fonte: compartilhado/.
+for skill in fechar-sessao finalizar-tarefa; do
+  cp compartilhado/identificar-doc.md "$skill/skills/$skill/references/identificar-doc.md"
+  echo "  → $skill/skills/$skill/references/identificar-doc.md"
+done
+echo "identificar-doc.md sincronizado."

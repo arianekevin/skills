@@ -1,0 +1,18 @@
+{
+  "name": "fechar-sessao",
+  "description": "Records where the session stopped so the next one can pick up cold: what was done, agreed and deferred, and the next step — in the task's own pending doc (docs/pendencias/<task>.md) or in the continuity doc the repo already mandates. Tells whether an existing doc belongs to this task before touching it. Never commits without asking.",
+  "version": "1.0.0",
+  "author": {
+    "name": "arianecasas"
+  },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": [
+    "handoff",
+    "session",
+    "continuity",
+    "workflow",
+    "skill"
+  ]
+}
