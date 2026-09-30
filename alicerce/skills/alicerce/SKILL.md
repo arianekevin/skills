@@ -1,6 +1,6 @@
 ---
 name: alicerce
-description: "Fundação de projeto — especifica o 'passo 0' e documenta, sem implementar nada. Use esta skill quando o dev for começar um projeto novo, quando perguntar 'por onde eu começo', 'como estruturar esse projeto', 'o que preciso ter antes de codar', ou quando mencionar 'setup inicial', 'estrutura de projeto', 'design system', 'ADR', 'padrão de projeto', 'documentação do projeto', 'boilerplate', 'scaffolding', 'fundação'. Também use quando o projeto já existe e o dev quiser saber o que falta de fundação — 'o que falta aqui', 'auditar o projeto', 'está bem estruturado?'. Detecta sozinha se é projeto novo ou existente e produz documentos: o plano, as convenções e as regras de trabalho. NÃO escreve código, não instala nada, não sobe serviço — quem implementa é a skill obra, lendo o que esta aqui especificou."
+description: "Fundação de projeto — especifica o 'passo 0' e documenta, sem implementar nada. Use quando o dev for começar um projeto novo e quiser saber por onde começar e o que precisa existir antes de codar; quando quiser saber o que falta de fundação num projeto que já existe; ou quando for especificar uma coisa nova grande dentro de um projeto existente. Detecta sozinha o caso e produz documentos: o plano, as convenções e as regras de trabalho. NÃO escreve código, não instala nada, não sobe serviço — quem implementa é a skill obra, lendo o que esta aqui especificou. Não é para escrever um ADR avulso nem para trabalho de design system de interface."
 ---
 
 # Alicerce — especificação de fundação
@@ -141,10 +141,10 @@ levantado a fase inteira errada.
 
 ## Adaptação ao contexto
 
-Antes de propor qualquer convenção, veja o que o dev já adota:
+Antes de propor qualquer convenção, veja o que o dev já adota. As instruções globais
+dele (`~/.claude/CLAUDE.md`) já estão no seu contexto; os vizinhos, não:
 
 ```bash
-cat ~/.claude/CLAUDE.md 2>/dev/null | head -40
 ls ../*/.editorconfig ../*/.github/workflows 2>/dev/null | head
 ```
 

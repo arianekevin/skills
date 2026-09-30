@@ -58,6 +58,10 @@ chamada que altera dado em ambiente compartilhado.
 Autorização não se estende: aprovar um push não aprova o próximo, e aprovar um
 comentário em ticket não aprova mexer no estado dele.
 
+A exceção é `git push` num repositório com autorização registrada — na memória ou no
+`CLAUDE.md` do projeto. Ela vale só para aquele repositório e dispensa o pedido na
+sessão; sem esse registro, a regra acima continua valendo.
+
 **E não encoste em processo, porta ou container que não é seu.** A máquina do dev tem
 outros projetos rodando. Encerre pelo **PID que você mesmo guardou**, nunca por padrão
 de nome — `pkill -f vite` derruba o servidor de desenvolvimento de outro projeto, e

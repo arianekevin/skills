@@ -1,6 +1,6 @@
 {
   "name": "skills",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, the capture/run pair for unattended improvement work, and the bug diagnosis/fix pair used on NectarCRM, and the session handoff pair: close a session with a resumable record, finish a task and retire it, and a Bitbucket pull request reviewer that applies its verdict.",
   "owner": {
     "name": "arianecasas"

@@ -40,7 +40,7 @@ ou se a próxima sessão vai tropeçar nele.
 
 ## Passo 3 — Escrever
 
-Regras (as mesmas do CONTINUIDADE do ndesk, que funcionam):
+Regras:
 1. **Fato verificado, não intenção.** "1405 testes verdes" vale; "deve estar passando" não. O que não
    foi medido diz que não foi medido.
 2. **Decisão leva o porquê e o gatilho de revisita.** "Adiado" sem "volta quando…" vira ruído.

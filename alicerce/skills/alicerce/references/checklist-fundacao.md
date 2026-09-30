@@ -28,10 +28,10 @@ em `docs/adr/0001-*.md`.
 
 | Arquivo | Seções de título fixo |
 |---|---|
-| `README.md` | O que é · Rodar · Índice |
-| `CLAUDE.md` | Regras que não se quebram · Estrutura · Armadilhas |
+| `README.md` | Rodar · Documentos · O que dá pra fazer |
+| `CLAUDE.md` | Comandos · Regras que não se quebram · Estrutura · Armadilhas já encontradas aqui |
 | `CONTRIBUTING.md` | Definition of Done · Testes · Commits e revisão |
-| `docs/PLANO-FUNDACAO.md` | Requisitos para a obra · Adiado de propósito · Não se aplica |
+| `docs/PLANO-FUNDACAO.md` | Requisitos para a obra (com Adiado de propósito e Não se aplica dentro) · Verificação por fase · Desvios do plano |
 | `docs/adr/` | um arquivo por decisão |
 
 Sem títulos estáveis não existe "sei onde procurar": o dev e a IA saltam pela seção.
@@ -165,7 +165,7 @@ Coberta pelo contrato (área 0). O que a régua acrescenta:
 | Item | Pri | Onde é imposto |
 |---|---|---|
 | README que roda o projeto em ≤3 comandos | P0 | seguir do zero e funcionar |
-| `## Armadilhas` no `CLAUDE.md`, alimentada durante a obra | P0 | acordo |
+| `## Armadilhas já encontradas aqui` no `CLAUDE.md`, alimentada durante a obra | P0 | acordo |
 | Traço de uma requisição ponta a ponta | P1 | acordo |
 
 O traço — "entra aqui, valida ali, grava lá, erro sobe pro handler único" — é o que

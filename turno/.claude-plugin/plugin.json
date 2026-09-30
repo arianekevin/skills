@@ -1,7 +1,7 @@
 {
   "name": "turno",
   "description": "Runs the improvements the pauta left ready, unsupervised, on a single night branch — one commit per item, a regression guard on every item, and a morning report. Asks nothing: an item that needs a decision is stopped and handed back to the pauta.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "arianecasas"
   },

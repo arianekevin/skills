@@ -1,7 +1,7 @@
 {
   "name": "finalizar-tarefa",
   "description": "Closes a task for good: reads its pending doc, points out what is still open (next step, deferred items, uncommitted or unpushed work), asks for an explicit yes, then removes the doc — committing the removal, with the deferred items in its message, only if asked.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "arianecasas"
   },

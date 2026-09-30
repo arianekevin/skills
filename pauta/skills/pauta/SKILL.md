@@ -83,7 +83,7 @@ motivo — ou vira `/ciclo` com o dev na sala, que é a skill feita para julgame
 
 ### 4. Escopo — os caminhos que pode tocar, os que não pode, e o tamanho
 
-Escreva os dois lados. `pode` é o glob dos arquivos; `nao-mexe` existe para os vizinhos perigosos
+Escreva os dois lados. `pode` é o glob dos arquivos; `nao_mexe` existe para os vizinhos perigosos
 (`src/api/**`, migrations, config de infra, qualquer pasta com trabalho em andamento).
 
 E meça o tamanho: quantos arquivos o `grep` do critério devolve hoje. **Item que não cabe em cinco
@@ -141,9 +141,9 @@ Um item por arquivo, em `docs/melhorias/`, nome `<id>.md`. **A pasta é o estado
 Use `assets/item.template.md` como molde. Copie para `docs/melhorias/pronto/` (ou `rascunho/`,
 `bloqueado/`) e preencha — o template traz os campos e um exemplo real preenchido logo abaixo.
 
-Os campos do frontmatter são o contrato com a `turno`: `objetivo`, `criterio`, `escopo`, `orcamento`
-viram diretamente os três insumos do `/ciclo`, e `tipo` (`melhoria` ou `bug`) decide o ritual que o
-turno aplica. Escrever mal aqui é fazer o agente iterar rumo à
+Os campos do frontmatter são o contrato com a `turno`: `objetivo`, `criterio` e `orcamento` viram
+diretamente os três insumos do `/ciclo` (objetivo, indicador, orçamento), `escopo` vira o limite dele,
+e `tipo` (`melhoria` ou `bug`) decide o ritual que o turno aplica. Escrever mal aqui é fazer o agente iterar rumo à
 coisa errada, com disciplina.
 
 ## Fluxo

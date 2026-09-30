@@ -236,8 +236,7 @@ acordaria sem saber se foi você ou ela.
 
 **O ritual de cada item**, sem atalho: conferência da âncora na fonte (o precedente, ou a causa raiz
 do bug) → baseline do critério (se já passa, item fechado sem commit) → execução pela `ciclo`, que
-recebe os três insumos já prontos do arquivo → revisão do próprio diff pela `bug-reviewer`, o único
-olho que esse código terá até de manhã → guarda de regressão inteira → conferência de escopo por
+recebe os três insumos já prontos do arquivo → guarda de regressão inteira → conferência de escopo por
 `git status --porcelain` → commit por pathspec explícito, ou reversão. Escopo estourado é item falho
 mesmo com o critério verde.
 

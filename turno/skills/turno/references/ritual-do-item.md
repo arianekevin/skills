@@ -86,8 +86,8 @@ nenhuma. Passe explicitamente:
 - **como fazer**: a seção *Como fazer* e a seção *O que este item NÃO é* — essa segunda é a que
   impede o loop de "melhorar um pouco mais" fora do que foi combinado.
 
-Em item de `tipo: bug`, o fluxo é o da **`bug-guardrail`** — as cancelas dela (causa raiz, cenários,
-escopo) já foram conferidas nos passos 2 e 3b, e a correção mira a causa que está escrita, não o
+Em item de `tipo: bug`, a execução continua pela `ciclo`. As cancelas da **`bug-guardrail`** (causa
+raiz, cenários, escopo) já foram conferidas nos passos 2 e 3b, e a correção mira a causa que está escrita, não o
 sintoma que o teste mostra. Correção que faz o teste passar sem tocar em `causa_raiz.onde` merece
 desconfiança: registre isso no relatório, porque de manhã é exatamente o commit que ele vai querer
 olhar primeiro.
@@ -96,16 +96,7 @@ Valem as paradas da própria `ciclo`: mesma assinatura de falha duas voltas segu
 esgotado, correção que exigiria sair do escopo. Nenhuma delas vira pedido de mais voltas — aqui não
 há a quem pedir. Item que estourou o orçamento é item falho, e amanhã o dev decide.
 
-## 5. Revisar o próprio diff
-
-Rode a **`bug-reviewer`** sobre o diff do item antes de qualquer commit. É o único olho que esse
-código vai ter até de manhã.
-
-Achado grave — comportamento alterado, caso não coberto, texto de usuário modificado sem o item
-pedir — **reverte o item**. Não tente consertar o achado numa volta extra: você já está fora do
-orçamento e sem supervisão. Anote o achado no relatório; ele vale mais que o commit.
-
-## 6. Guarda de regressão
+## 5. Guarda de regressão
 
 Rode **todos** os comandos mecânicos do projeto — `type-check`, `test`, `lint`, `build` —, inclusive
 os que não estão no critério do item, e inclusive os que você acabou de rodar na volta final da
@@ -115,7 +106,7 @@ A guarda não é o critério: o critério diz se o item ficou pronto, a guarda d
 de pé. Guarda vermelha reverte o item mesmo com o critério verde. Não existe "avanço parcial" numa
 noite sem supervisão.
 
-## 7. Conferir o escopo
+## 6. Conferir o escopo
 
 ```
 git status --porcelain
@@ -126,7 +117,7 @@ pareça óbvia e correta, é **escopo estourado** — reverta o item inteiro e r
 um recorte; entregar mais que o combinado, sem ele por perto, é a forma mais fácil de torrar a
 confiança nesta skill.
 
-## 8. Commitar, ou reverter
+## 7. Commitar, ou reverter
 
 **Reverter** é seguro aqui — e só aqui — porque a cancela 2 garantiu a árvore limpa no início da
 noite e cada item começa de um commit da própria branch. Não há trabalho não commitado do dev para
@@ -139,7 +130,7 @@ git restore --source=HEAD --staged --worktree -- <globs do escopo>
 Depois de reverter, confirme com `git status --porcelain` que a árvore voltou a ficar vazia. Reversão
 que não foi conferida contamina o próximo item, e aí a noite inteira vira uma coisa só.
 
-**Commitar**, quando critério verde, revisão limpa, guarda verde e escopo respeitado:
+**Commitar**, quando critério verde, guarda verde e escopo respeitado:
 
 ```
 git add -- <globs do escopo>        # nunca -A, nunca .
@@ -162,7 +153,7 @@ Turno: <AAAA-MM-DD>
 
 O trailer `Turno:` existe para ele filtrar a noite inteira com um `git log --grep`.
 
-## 9. Fechar o item no disco
+## 8. Fechar o item no disco
 
 No mesmo momento — não no fim da noite:
 

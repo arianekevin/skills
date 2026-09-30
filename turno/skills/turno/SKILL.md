@@ -106,8 +106,8 @@ deveria estar aqui — deveria ter sido corrigido de dia, pela `bug-guardrail`, 
 ## O ritual de cada item
 
 Idêntico para todos, sem atalho. Está em **`references/ritual-do-item.md`** — leia antes do primeiro
-item e siga passo a passo: baseline, execução pela `ciclo`, revisão do próprio diff pela
-`bug-reviewer`, guarda de regressão, commit por pathspec, atualização do item no disco.
+item e siga passo a passo: baseline, execução pela `ciclo`, guarda de regressão, commit por
+pathspec, atualização do item no disco.
 
 ## A memória é o disco, não a conversa
 
@@ -125,10 +125,9 @@ exatamente onde você estava. O que só existe na conversa não sobrevive à noi
 
 | Quando | Skill | Como |
 |---|---|---|
-| Executar o item | **`ciclo`** | O item já traz os três insumos prontos: `objetivo`, `criterio`, `orcamento`. A spec está fechada — a `ciclo` não deve perguntar nada, e o escopo dela são os globs do item. |
-| Antes de cada commit | **`bug-reviewer`** | Revise o **seu próprio** diff. Código de IA sem nenhum olho humano, de madrugada, é literalmente o caso de uso dela. Achado grave reverte o item. |
-| A guarda quebrou e você não sabe por quê | **`bug-diagnostico`** | Só para **entender**, nunca para corrigir. O resultado vira um item em `rascunho/` com a investigação anexada. |
-| O item é `tipo: bug` | **`bug-guardrail`** | As cancelas dela (causa raiz, cenários, escopo) já estão no item — confira as três e siga por ela, não pela `ciclo` direto. Causa raiz ausente ou que não bate com o código: pare e devolva para `bloqueado/`. |
+| Executar o item | **`ciclo`** | O item já traz os três insumos prontos: `objetivo`, `criterio`, `orcamento`. **A aprovação do orçamento no início da noite vale como o "Pode rodar?" da `ciclo`** — ela não pergunta nada, e o escopo dela são os globs do item. |
+| O item é `tipo: bug` | **`bug-guardrail`**, só como checklist | As cancelas dela (causa raiz, cenários, escopo) já estão no item e você as confere nos passos 2 e 3b do ritual. A execução é pela `ciclo` e o commit é seu: as perguntas da `bug-guardrail` e a proibição de modo autônomo valem com o dev presente, não aqui. Causa raiz ausente ou que não bate com o código: pare e devolva para `bloqueado/`. |
+| A guarda quebrou e você não sabe por quê | nenhuma | Não diagnostique: a `bug-diagnostico` é conversa com o dev. Registre o comando e a saída, reverta o item, e deixe a guarda quebrada como item em `rascunho/`. |
 
 ## Paradas
 

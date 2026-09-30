@@ -15,9 +15,11 @@ sem saber o que já foi pesado.
    dois que brigam
 4. Só então, o que é popular
 
+As instruções globais do dev (`~/.claude/CLAUDE.md`) já estão no seu contexto. Os
+vizinhos, não:
+
 ```bash
 ls ../*/package.json ../*/pom.xml 2>/dev/null | head
-cat ~/.claude/CLAUDE.md 2>/dev/null | head -40
 ```
 
 ## Verifique antes de fixar

@@ -140,8 +140,7 @@ Estas ações são proibidas em qualquer circunstância:
 - **Fazer commit** — o dev faz o commit após revisão completa
 - **Diagnóstico** — se o dev não tem a causa raiz, redirecione para bug-diagnostico
 
-Se o dev pressionar para pular etapas:
-> "Entendo a pressão, mas esse processo existe porque correção sem causa raiz volta — e volta como hotfix, que é mais caro e em hora pior. Investir 10 minutos agora evita isso. Vamos passar pelos gates — é rápido."
+Se o dev pressionar para pular etapas, diga em uma frase por que o gate existe — correção sem causa raiz volta, e volta como hotfix, mais caro e em hora pior — e siga no gate em que ele está.
 
 ## Tom e postura
 
