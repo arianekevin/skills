@@ -2,8 +2,8 @@
 """Operações mínimas no Bitbucket Cloud para a revisão de PRs.
 
 Uso:
-  bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor)
-  bitbucket.py info PR [PR ...]                # título, branches, autor, estado
+  bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor, revisão)
+  bitbucket.py info PR [PR ...]                # título, branches, autor, estado, revisão
   bitbucket.py describe PR                     # descrição do PR
   bitbucket.py comment ARQUIVO.md              # posta cada seção "## ... (#<pr>)" no PR indicado
   bitbucket.py request-changes PR [PR ...]     # marca request changes
@@ -53,6 +53,16 @@ def call(method, path, body=None, params=None):
         return e.code, e.read()[:300].decode(errors="replace")
 
 
+def review(pr):
+    """Revisão ativa no PR: `changes_requested`, `approved` ou `sem revisão`, com quem marcou.
+    Request changes pesa mais que aprovação: se houver os dois, vale o request changes."""
+    for state in ("changes_requested", "approved"):
+        who = [p["user"]["display_name"] for p in pr.get("participants", []) if p.get("state") == state]
+        if who:
+            return f"{state} ({', '.join(who)})"
+    return "sem revisão"
+
+
 def post_state(base, pr, action):
     st, d = call("POST", f"{base}/{pr}/{action}")
     if st == 400:  # logo após comentar o Bitbucket às vezes devolve 400; a segunda tentativa passa
@@ -77,8 +87,9 @@ def main():
     if a.cmd == "find":
         for b in a.branches:
             st, d = call("GET", base, params={"q": f'source.branch.name="{b}"', "state": "OPEN",
-                                               "fields": "values.id,values.destination.branch.name,values.author.display_name"})
-            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"]) for p in d["values"]]
+                                               "fields": "values.id,values.destination.branch.name,values.author.display_name,"
+                                                         "values.participants.state,values.participants.user.display_name"})
+            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], review(p)) for p in d["values"]]
                   if st == 200 else f"ERRO {st} {d}")
 
     elif a.cmd == "info":
@@ -87,7 +98,7 @@ def main():
             if st != 200:
                 print(pr, "ERRO", st, d); continue
             print(pr, "|", d["state"], "|", d["source"]["branch"]["name"], "->", d["destination"]["branch"]["name"],
-                  "|", d["author"]["display_name"], "|", d["title"])
+                  "|", d["author"]["display_name"], "|", review(d), "|", d["title"])
 
     elif a.cmd == "describe":
         st, d = call("GET", f"{base}/{a.pr}", params={"fields": "description"})

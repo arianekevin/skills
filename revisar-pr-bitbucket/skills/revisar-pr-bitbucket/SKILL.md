@@ -43,9 +43,11 @@ OUT=<scratchpad>/revisar-pr-bitbucket
 python3 $S/youtrack.py --url '<link do youtrack>' --out $OUT/issues   # ou --query / --ids
 cd <clone do repo> && git fetch origin --prune -q
 python3 $S/bitbucket.py find <branch> ...      # PR aberto de cada branch
-python3 $S/bitbucket.py info <pr> ...          # origem -> destino, autor
+python3 $S/bitbucket.py info <pr> ...          # origem -> destino, autor, revisão ativa
 python3 $S/bitbucket.py describe <pr>          # descrição do PR
 ```
+
+**Varredura de lista não repassa PR já revisado.** Quando a entrada é uma lista (filtro/link do YouTrack, vários tickets ou branches), PR com revisão ativa — `changes_requested` ou `approved` na coluna de revisão do `find`/`info` — sai da lista: não é revisado, comentado nem remarcado. Vai para o fim do relatório como "pulado (request changes de X / aprovado por Y)". PR pedido pelo número, link ou branch isolada é revisado mesmo assim: aí o pedido é explícito.
 
 Para cada ticket, ache o código:
 - Branch do PR → `git diff $(git merge-base origin/<destino> origin/<branch>) origin/<branch>`, com o destino real do PR.
@@ -54,7 +56,7 @@ Para cada ticket, ache o código:
 - PR de branch agregadora (`qa`, `release`…): tire os tickets das mensagens de commit, baixe com `youtrack.py --ids` e revise commit a commit, conferindo o estado final na branch. Um comentário só no PR, com uma linha por ticket.
 - PR sem ticket: a pergunta 1 vira "faz o que a descrição do PR promete?".
 
-Diga em uma linha quantos tickets, quantos com PR, quais sem PR ou empilhados.
+Diga em uma linha quantos tickets, quantos com PR, quantos pulados por revisão ativa, quais sem PR ou empilhados.
 
 ## Passo 2 — Revisar
 
@@ -75,7 +77,7 @@ Achados mais graves (❌ e brecha de segurança): confira você no código antes
 
 ## Passo 3 — Entregar no chat
 
-Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados, e achados anteriores ao PR, fora do escopo (uma linha cada).
+Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados por revisão ativa (quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados, e achados anteriores ao PR, fora do escopo (uma linha cada).
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria
@@ -108,4 +110,4 @@ python3 $S/bitbucket.py approve <prs ✅>
 ```
 Releia o arquivo antes de postar (o dev pode ter editado). Confira a saída de cada chamada; ERRO em algum PR é dito com o número do PR que ficou sem ação.
 
-Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada).
+Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada / pulado: revisão ativa).
