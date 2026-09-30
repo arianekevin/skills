@@ -14,6 +14,7 @@ instale só o que faz sentido na máquina.
 | **finalizar-tarefa** | Aponta o que ainda está aberto, pede o sim e aposenta o doc de pendências da tarefa | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
+| **revisar-pr-bitbucket** | Revisa PRs do Bitbucket em três perguntas — resolve, quebra, abre brecha — e aplica: comentário + request changes, ou aprovação | genérico (Bitbucket + YouTrack) |
 
 ## Instalação
 
@@ -28,11 +29,12 @@ instale só o que faz sentido na máquina.
 /plugin install finalizar-tarefa@skills
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills
+/plugin install revisar-pr-bitbucket@skills
 ```
 
 ## Padrões comuns
 
-As nove skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+As dez skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
 
 1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
    decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
@@ -333,6 +335,33 @@ Só então planeja, implementa, apresenta para revisão, gera testes e documenta
 
 Não gera código antes das cancelas — nem sob pressa. Não faz commit. Se o dev não tem a causa raiz,
 redireciona para a `bug-diagnostico`.
+
+---
+
+## revisar-pr-bitbucket
+
+Revisão de PR com um objetivo só: não deixar passar coisa absurda. Três perguntas, nada além —
+**resolve** o ticket do YouTrack em todos os caminhos que levam a ele, **quebra** algo dentro ou fora
+do escopo (banco incluído: listagem sem paginação, transação aberta enquanto chama serviço externo,
+migration com lock em tabela grande) e **abre brecha** de segurança. Estilo e "melhor forma de fazer"
+ficam de fora.
+
+Aceita link ou filtro do YouTrack, ids de ticket, PR ou branch. Acha o PR de cada ticket, separa o que
+não tem PR (commit direto), branch empilhada e branch agregadora, e divide em subagentes quando o
+volume pede. Achado grave é conferido no código antes de sair.
+
+**Aplica no Bitbucket.** PR com ajuste recebe um comentário curto por achado — problema, evidência com
+`arquivo:linha`, sugestão que não quebra a correção — e **request changes**; PR ok é **aprovado**. Nunca
+faz merge nem decline. Com "só avalia", para antes e mostra o que comentaria. Revisão que não fechou
+sai **INCONCLUSIVO** e o PR fica sem ação.
+
+**Contexto do projeto fora do repositório.** O que faz a revisão achar o que importa — portas
+paralelas, o que cada gate de permissão checa, regras de domínio que não são achado — fica em
+`~/.claude/revisar-pr-bitbucket/contexto/<repo>.md`, na máquina do dev. Não é publicado e não some
+quando o plugin atualiza.
+
+**Precisa de:** `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (API token do Atlassian com
+`read:pullrequest:bitbucket` e `write:pullrequest:bitbucket`), `YOUTRACK_API_TOKEN`, e o clone do repo.
 
 ---
 
