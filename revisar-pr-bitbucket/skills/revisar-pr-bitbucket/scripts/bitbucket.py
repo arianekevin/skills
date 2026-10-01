@@ -33,9 +33,12 @@ não conta como ativa: o PR volta como `REVISAR: commit novo depois de <revisão
 Formato do ARQUIVO.md para `comment`: seções `## <rótulo> (#<pr>)`. Seção sem número
 de PR é ignorada e listada no fim.
 """
-import argparse, base64, json, os, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import argparse, base64, json, os, pathlib, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 
 API = "https://api.bitbucket.org/2.0/repositories"
+# marca já calculada de cada PR, para não reler a activity de PR que não mudou
+CACHE = pathlib.Path(os.environ.get("XDG_CACHE_HOME", "~/.cache")).expanduser() / "revisar-pr-bitbucket" / "marcas.json"
+_cache = None
 
 
 def resolve_repo(arg):
@@ -108,6 +111,38 @@ def news_after_review(base, pr_id, reviewers):
     return False, False
 
 
+def snapshot(pr):
+    """Retrato do que decide a marca: data de atualização (commit, revisão, título), número de
+    comentários (comentário não mexe na data de atualização) e quem tem marca ativa.
+    None quando a consulta não trouxe esses campos."""
+    if pr.get("updated_on") is None or pr.get("comment_count") is None:
+        return None
+    states = sorted([p["user"].get("uuid"), p["state"]] for p in pr.get("participants", []) if p.get("state"))
+    return [pr["updated_on"], pr["comment_count"], states]
+
+
+def cached_mark(key, snap, new=None):
+    """Lê (ou, com `new`, grava) a marca guardada para o PR `key` enquanto o retrato for o mesmo."""
+    global _cache
+    if _cache is None:
+        try:
+            _cache = json.loads(CACHE.read_text())
+        except (OSError, ValueError):
+            _cache = {}
+    if new is None:
+        hit = _cache.get(key)
+        return hit["marca"] if hit and hit["retrato"] == snap else None
+    _cache[key] = {"retrato": snap, "marca": new}
+    try:
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CACHE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(_cache))
+        tmp.replace(CACHE)
+    except OSError:
+        pass
+    return new
+
+
 def mark(base, pr, pr_id=None):
     """REVISAR ou PULAR: <motivo>. Fica fora da análise o PR que não está aberto, que está em
     draft ou que tem revisão ativa sem commit nem comentário de terceiro depois dela."""
@@ -118,19 +153,26 @@ def mark(base, pr, pr_id=None):
     r = review(pr)
     if r == "sem revisão":
         return "REVISAR"
+    key, snap = f"{base}/{pr_id or pr['id']}", snapshot(pr)
+    if snap:
+        hit = cached_mark(key, snap)
+        if hit:
+            return hit
     reviewers = {p["user"].get("uuid") for p in pr.get("participants", []) if p.get("state")}
     commit, comment = news_after_review(base, pr_id or pr["id"], reviewers)
     if commit or comment:
         news = " e ".join(n for n, on in (("commit", commit), ("comentário", comment)) if on)
-        return f"REVISAR: {news} novo depois de {r}"
-    return f"PULAR: {r}"
+        m = f"REVISAR: {news} novo depois de {r}"
+    else:
+        m = f"PULAR: {r}"
+    return cached_mark(key, snap, m) if snap else m
 
 
 def guard(base, pr, isolated=False):
     """Escrita só em PR que `mark` manda revisar. `isolated`: o dev pediu este PR sozinho, pelo número."""
     if isolated:
         return True
-    st, d = call("GET", f"{base}/{pr}", params={"fields": "state,draft,participants.state,participants.user.display_name,participants.user.uuid"})
+    st, d = call("GET", f"{base}/{pr}", params={"fields": "state,draft,updated_on,comment_count,participants.state,participants.user.display_name,participants.user.uuid"})
     if st != 200:
         print(pr, f"ERRO {st} {d}"); return False
     m = mark(base, d, pr)
@@ -158,6 +200,7 @@ def open_prs(base, dest=None, author=None, reviewer=None):
     prs = paginate(base, {"q": q, "pagelen": 50,
                           "fields": "next,values.id,values.title,values.source.branch.name,values.destination.branch.name,"
                                     "values.author.display_name,values.author.nickname,values.draft,"
+                                    "values.updated_on,values.comment_count,"
                                     "values.reviewers.display_name,values.reviewers.nickname,"
                                     "values.participants.state,values.participants.user.display_name,values.participants.user.uuid"})
     if author:
@@ -217,7 +260,8 @@ def main():
     if a.cmd == "find":
         for b in a.branches:
             st, d = call("GET", base, params={"q": f'source.branch.name="{b}" AND state="OPEN"',
-                                               "fields": "values.id,values.draft,values.destination.branch.name,values.author.display_name,"
+                                               "fields": "values.id,values.draft,values.updated_on,values.comment_count,"
+                                                         "values.destination.branch.name,values.author.display_name,"
                                                          "values.participants.state,values.participants.user.display_name,values.participants.user.uuid"})
             print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], mark(base, p)) for p in d["values"]] or "sem PR aberto"
                   if st == 200 else f"ERRO {st} {d}")
