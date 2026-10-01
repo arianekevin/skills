@@ -1,6 +1,6 @@
 ---
 name: revisar-pr-bitbucket
-description: "Avalia PRs do Bitbucket para barrar o absurdo antes do merge: se corrigem o ticket do YouTrack, se quebram algo dentro ou fora do escopo (inclusive travar banco) e se abrem brecha de segurança — e aplica o resultado no Bitbucket: PR com ajuste recebe comentário + request changes, PR ok é aprovado (sem merge). Use quando o dev invocar /revisar-pr-bitbucket, mandar um link ou filtro do YouTrack, uma lista de tickets, um número ou link de PR do Bitbucket ou uma branch, e pedir para 'avaliar os PRs', 'olhar os PRs desses tickets', 'revisar a versão', 'ver se pode mergear'. NÃO avalia estilo nem 'melhor forma de fazer'."
+description: "Avalia PRs do Bitbucket para barrar o absurdo antes do merge: se corrigem o ticket do YouTrack, se quebram algo dentro ou fora do escopo (inclusive travar banco) e se abrem brecha de segurança — e aplica o resultado no Bitbucket: PR com ajuste recebe comentário + request changes, PR ok é aprovado (sem merge). Use quando o dev invocar /revisar-pr-bitbucket, mandar um link ou filtro do YouTrack, um link da lista de PRs do Bitbucket, uma lista de tickets, um número ou link de PR do Bitbucket ou uma branch, e pedir para 'avaliar os PRs', 'olhar os PRs desses tickets', 'revisar a versão', 'ver se pode mergear'. NÃO avalia estilo nem 'melhor forma de fazer'."
 ---
 
 # Revisar PR no Bitbucket
@@ -28,26 +28,30 @@ Se existir `~/.claude/revisar-pr-bitbucket/contexto/<slug-do-repo>.md`, leia ant
 ## Pré-requisitos
 
 - `BITBUCKET_EMAIL` e `BITBUCKET_API_TOKEN` no ambiente. Se o shell da sessão não os carregou, `source ~/.zshrc` (ou o arquivo onde o dev os pôs) no mesmo comando.
-- `YOUTRACK_API_TOKEN` (e `YOUTRACK_URL`, quando a entrada não é um link) para ler tickets.
+- `YOUTRACK_API_TOKEN` (e `YOUTRACK_URL`, quando a entrada não é um link do YouTrack) para ler tickets. Se o ambiente não tiver `YOUTRACK_URL`, use o que o arquivo de contexto do projeto indicar.
 - Clone local do repo do PR, para ler o diff. Os scripts descobrem `workspace/slug` pelo `git remote` do diretório atual; fora dele, `--repo workspace/slug`.
 
 Sem token do Bitbucket: peça para o dev criar em https://id.atlassian.com/manage-profile/security/api-tokens → "Create API token with scopes" → app Bitbucket → `read:pullrequest:bitbucket` + `write:pullrequest:bitbucket` (nada de admin, delete ou write:repository), validade curta, e pôr as duas variáveis no arquivo de perfil do shell pelo editor — nunca colar o token no chat. Não procure credencial em keychain ou arquivos.
 
 ## Passo 1 — Montar a lista
 
-Entrada: link/filtro do YouTrack, ids de ticket, número/link de PR ou branch.
+Entrada: link/filtro do YouTrack, link da lista de PRs do Bitbucket, ids de ticket, número/link de PR ou branch.
 
 ```bash
 S=<diretório desta skill>/scripts
 OUT=<scratchpad>/revisar-pr-bitbucket
 python3 $S/youtrack.py --url '<link do youtrack>' --out $OUT/issues   # ou --query / --ids
 cd <clone do repo> && git fetch origin --prune -q
+python3 $S/bitbucket.py list --dest <branch> [--author <nome>]   # PRs abertos (entrada = lista do Bitbucket)
 python3 $S/bitbucket.py find <branch> ...      # PR aberto de cada branch
 python3 $S/bitbucket.py info <pr> ...          # origem -> destino, autor, revisão ativa
 python3 $S/bitbucket.py describe <pr>          # descrição do PR
+python3 $S/bitbucket.py comments <pr>          # comentários do PR (o dev pode já ter respondido ali)
 ```
 
-**Varredura de lista não repassa PR já revisado.** Quando a entrada é uma lista (filtro/link do YouTrack, vários tickets ou branches), PR com revisão ativa — `changes_requested` ou `approved` na coluna de revisão do `find`/`info` — sai da lista: não é revisado, comentado nem remarcado. Vai para o fim do relatório como "pulado (request changes de X / aprovado por Y)". PR pedido pelo número, link ou branch isolada é revisado mesmo assim: aí o pedido é explícito.
+Link da lista de PRs do Bitbucket: leia destino (`at=`) e autor do link e use `list`. O ticket de cada PR sai do nome da branch, do título ou da descrição.
+
+**Varredura de lista não repassa PR já revisado.** Quando a entrada é uma lista (filtro/link do YouTrack, lista de PRs do Bitbucket, vários tickets ou branches), PR com revisão ativa — `changes_requested` ou `approved` na coluna de revisão do `list`/`find`/`info` — sai da lista: não é revisado, comentado nem remarcado. Vai para o fim do relatório como "pulado (request changes de X / aprovado por Y)". PR pedido pelo número, link ou branch isolada é revisado mesmo assim: aí o pedido é explícito.
 
 Para cada ticket, ache o código:
 - Branch do PR → `git diff $(git merge-base origin/<destino> origin/<branch>) origin/<branch>`, com o destino real do PR.
@@ -65,7 +69,9 @@ Nunca faça checkout, commit ou push: só `git show`, `git diff`, `git grep`, `g
 Poucos PRs pequenos (até ~4): revise direto. Mais que isso, ou um PR grande: subagentes em paralelo, 3–5 tickets (ou um recorte do PR) por agente, agrupados por tema — permissão, validação de API, webhook/integração, job/migration —, empilhadas no mesmo agente. Cada agente recebe o bloco "Como revisar", o arquivo de contexto do projeto (se houver), os ids/branches/commits, o caminho dos JSON dos tickets e o foco do grupo ("gate de permissão: ache outras portas para a mesma ação").
 
 ### Como revisar (vale para você e para os agentes)
-- Leia o ticket inteiro: descrição, comentários de QA ("ampliação") e o "como testar" do dev.
+- Leia o ticket inteiro (descrição, comentários de QA — "ampliação" — e o "como testar" do dev), a descrição e os comentários do PR.
+- O fix bate com o erro real? Confira a causa declarada contra a stack, a mensagem e o schema (constraint, tipo de id, unique). Trocar `error` por `warn`, ou um catch que engole a exceção, esconde o sintoma, não corrige.
+- O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script ou migration), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
 - Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)?
 - Catch que só loga + nova validação = dado perdido em silêncio (lead, importação, webhook).
@@ -75,9 +81,18 @@ Poucos PRs pequenos (até ~4): revise direto. Mais que isso, ou um PR grande: su
 
 Achados mais graves (❌ e brecha de segurança): confira você no código antes de reportar, mesmo quando vieram de um agente.
 
+### Antes de fechar ❌ ou ⚠️: procure a explicação que falta
+O que parece faltar pode já estar respondido ou estar em outro PR. Só para PR com ❌/⚠️ (não em todo PR):
+1. Leia os comentários do PR (`comments`), se ainda não leu.
+2. Rode `python3 $S/bitbucket.py related <pr> --grep <exceção ou termo-chave>`: devolve só os PRs abertos para o mesmo destino que tocam os mesmos arquivos ou citam o termo.
+3. Achou candidato: leia o diff dele e teste o cenário do achado com os dois PRs somados.
+   - **Fecha:** o achado vira dependência — "Sobe junto com #X; merge do #X primeiro." —, e o veredito cai (❌→⚠️, ou ✅ com a nota de dependência).
+   - **Fecha em parte ou não fecha:** mantém o achado e diz o que falta mesmo com os dois.
+   - **Não deu para confirmar no código:** só aí "confirmar se #X cobre isto". É a exceção.
+
 ## Passo 3 — Entregar no chat
 
-Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados por revisão ativa (quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados, e achados anteriores ao PR, fora do escopo (uma linha cada).
+Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados por revisão ativa (quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados e dependências entre PRs (uma linha cada). Achado anterior ao PR, fora do escopo, só entra se for brecha de segurança ou quebra grave; o resto não é reportado.
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria

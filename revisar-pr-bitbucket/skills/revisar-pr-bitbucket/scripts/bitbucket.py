@@ -4,7 +4,12 @@
 Uso:
   bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor, revisão)
   bitbucket.py info PR [PR ...]                # título, branches, autor, estado, revisão
+  bitbucket.py list [--dest B] [--author NOME] # PRs abertos (id, branches, autor, revisão, título)
   bitbucket.py describe PR                     # descrição do PR
+  bitbucket.py comments PR                     # comentários do PR (autor, arquivo:linha se inline, texto)
+  bitbucket.py related PR [--grep TXT ...]     # outros PRs abertos para o mesmo destino que tocam os
+                                               # mesmos arquivos ou citam TXT no título/commits
+                                               # (só linhas que casaram; usa o clone local, rode git fetch antes)
   bitbucket.py comment ARQUIVO.md              # posta cada seção "## ... (#<pr>)" no PR indicado
   bitbucket.py request-changes PR [PR ...]     # marca request changes
   bitbucket.py approve PR [PR ...]             # aprova (não faz merge)
@@ -63,6 +68,44 @@ def review(pr):
     return "sem revisão"
 
 
+def paginate(path, params):
+    """Todas as páginas de uma listagem da API (segue `next`)."""
+    st, d = call("GET", path, params=params)
+    while True:
+        if st != 200:
+            sys.exit(f"ERRO {st} {d}")
+        yield from d.get("values", [])
+        nxt = d.get("next")
+        if not nxt:
+            return
+        st, d = call("GET", nxt.split(f"{API}/", 1)[1])
+
+
+def open_prs(base, dest=None, author=None):
+    # o estado vai dentro do `q`: com `q` presente, o parâmetro `state` solto é ignorado
+    q = 'state="OPEN"' + (f' AND destination.branch.name="{dest}"' if dest else "")
+    prs = paginate(base, {"q": q, "pagelen": 50,
+                          "fields": "next,values.id,values.title,values.source.branch.name,values.destination.branch.name,"
+                                    "values.author.display_name,values.author.nickname,"
+                                    "values.participants.state,values.participants.user.display_name"})
+    if author:
+        a = author.lower()
+        prs = (p for p in prs if a in (p["author"].get("display_name") or "").lower()
+               or a in (p["author"].get("nickname") or "").lower())
+    return list(prs)
+
+
+def git(*args):
+    r = subprocess.run(["git", *args], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def changed_files(dest, branch):
+    mb = git("merge-base", f"origin/{dest}", f"origin/{branch}")
+    out = git("diff", "--name-only", mb, f"origin/{branch}") if mb else None
+    return None if out is None else set(filter(None, out.splitlines()))
+
+
 def post_state(base, pr, action):
     st, d = call("POST", f"{base}/{pr}/{action}")
     if st == 400:  # logo após comentar o Bitbucket às vezes devolve 400; a segunda tentativa passa
@@ -77,7 +120,14 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("find").add_argument("branches", nargs="+")
     sub.add_parser("info").add_argument("prs", nargs="+")
+    p = sub.add_parser("list")
+    p.add_argument("--dest")
+    p.add_argument("--author")
     sub.add_parser("describe").add_argument("pr")
+    sub.add_parser("comments").add_argument("pr")
+    p = sub.add_parser("related")
+    p.add_argument("pr")
+    p.add_argument("--grep", action="append", default=[])
     sub.add_parser("comment").add_argument("file")
     sub.add_parser("request-changes").add_argument("prs", nargs="+")
     sub.add_parser("approve").add_argument("prs", nargs="+")
@@ -100,9 +150,61 @@ def main():
             print(pr, "|", d["state"], "|", d["source"]["branch"]["name"], "->", d["destination"]["branch"]["name"],
                   "|", d["author"]["display_name"], "|", review(d), "|", d["title"])
 
+    elif a.cmd == "list":
+        prs = open_prs(base, a.dest, a.author)
+        for p in prs:
+            print(p["id"], "|", p["source"]["branch"]["name"], "->", p["destination"]["branch"]["name"],
+                  "|", p["author"]["display_name"], "|", review(p), "|", p["title"])
+        print(f"{len(prs)} PR(s) aberto(s)")
+
     elif a.cmd == "describe":
         st, d = call("GET", f"{base}/{a.pr}", params={"fields": "description"})
         print(d.get("description", "") if st == 200 else f"ERRO {st} {d}")
+
+    elif a.cmd == "comments":
+        n = 0
+        for c in paginate(f"{base}/{a.pr}/comments", {"pagelen": 100}):
+            if c.get("deleted"):
+                continue
+            n += 1
+            inline = c.get("inline") or {}
+            where = f" [{inline.get('path')}:{inline.get('to') or inline.get('from')}]" if inline else ""
+            reply = " (resposta)" if c.get("parent") else ""
+            print(f"--- {c['user']['display_name']} {c['created_on'][:10]}{where}{reply}")
+            print(c["content"]["raw"].strip())
+        print(f"{n} comentário(s)")
+
+    elif a.cmd == "related":
+        st, d = call("GET", f"{base}/{a.pr}")
+        if st != 200:
+            sys.exit(f"ERRO {st} {d}")
+        dest, src = d["destination"]["branch"]["name"], d["source"]["branch"]["name"]
+        mine = changed_files(dest, src)
+        if mine is None:
+            sys.exit(f"branch origin/{src} ou origin/{dest} ausente no clone: rode git fetch origin --prune")
+        greps = [g.lower() for g in a.grep]
+        hits, missing = 0, []
+        for p in open_prs(base, dest):
+            if str(p["id"]) == str(a.pr):
+                continue
+            branch = p["source"]["branch"]["name"]
+            files = changed_files(dest, branch)
+            if files is None:
+                missing.append(str(p["id"])); continue
+            common = sorted(mine & files)
+            cited = []
+            if greps:
+                text = (p["title"] + "\n" + (git("log", "--format=%B", f"origin/{dest}..origin/{branch}") or "")).lower()
+                cited = [g for g in a.grep if g.lower() in text]
+            if common or cited:
+                hits += 1
+                parts = []
+                if common:
+                    parts.append("arquivos em comum: " + ", ".join(f.rsplit("/", 1)[-1] for f in common))
+                if cited:
+                    parts.append("cita: " + ", ".join(cited))
+                print(p["id"], "|", branch, "|", p["author"]["display_name"], "|", " | ".join(parts))
+        print(f"{hits} PR(s) relacionado(s)" + (f"; sem branch no clone: {', '.join(missing)}" if missing else ""))
 
     elif a.cmd == "comment":
         txt = open(a.file).read()

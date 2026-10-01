@@ -16,6 +16,8 @@ de domínio que derrubou um achado), sugira acrescentar uma linha ao arquivo —
 ## O que vale pôr
 
 - **Repos e branches:** onde fica o backend, o front, a branch-alvo dos PRs, como achar o repo de um commit.
+- **Ambiente:** valores que não são segredo e a revisão precisa, como o `YOUTRACK_URL` da instância.
+- **Autores automatizados:** bots que abrem PR e o que não vale como evidência neles (review do próprio bot, "testes passaram" na descrição, causa raiz copiada da sugestão do ticket).
 - **Portas paralelas:** os vários caminhos que chegam na mesma gravação (API v1/v2, telas antigas,
   ação em massa, importação, integrações, webhooks, jobs). É onde a correção de um lado deixa o outro aberto.
 - **Permissão:** o que cada anotação/gate realmente checa, configurações de conta que mudam o filtro,

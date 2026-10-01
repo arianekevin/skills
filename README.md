@@ -345,9 +345,11 @@ do escopo (banco incluído: listagem sem paginação, transação aberta enquant
 migration com lock em tabela grande) e **abre brecha** de segurança. Estilo e "melhor forma de fazer"
 ficam de fora.
 
-Aceita link ou filtro do YouTrack, ids de ticket, PR ou branch. Acha o PR de cada ticket, separa o que
+Aceita link ou filtro do YouTrack, link da lista de PRs do Bitbucket, ids de ticket, PR ou branch. Acha o PR de cada ticket, separa o que
 não tem PR (commit direto), branch empilhada e branch agregadora, e divide em subagentes quando o
-volume pede. Achado grave é conferido no código antes de sair.
+volume pede. Achado grave é conferido no código antes de sair, e antes de um ❌ ou ⚠️ ela lê os
+comentários do PR e procura outro PR aberto que cubra o problema — se cobre, o achado vira
+"sobe junto com #X". Também cobra o dado já quebrado no banco, não só o que vier depois do deploy.
 
 **Aplica no Bitbucket.** PR com ajuste recebe um comentário curto por achado — problema, evidência com
 `arquivo:linha`, sugestão que não quebra a correção — e **request changes**; PR ok é **aprovado**. Nunca
