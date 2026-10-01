@@ -17,8 +17,12 @@ Uso:
   bitbucket.py approve PR [PR ...]             # aprova (não faz merge)
 
 Repo: --repo workspace/slug, ou $BITBUCKET_REPO, ou o remote `origin` do git no diretório atual.
-Credenciais: $BITBUCKET_EMAIL e $BITBUCKET_API_TOKEN (API token do Atlassian com
-read:pullrequest:bitbucket + write:pullrequest:bitbucket).
+Credenciais, uma das duas:
+  - $BITBUCKET_ACCESS_TOKEN: access token do repositório (Repository settings > Access tokens), com
+    Repositories: Read e Pull requests: Read + Write. Age como um usuário-bot com o nome do token.
+    Se estiver definido, é o que vale.
+  - $BITBUCKET_EMAIL e $BITBUCKET_API_TOKEN: API token do Atlassian, com read:pullrequest:bitbucket
+    + write:pullrequest:bitbucket. Age como o dono do token.
 Nunca recusa (decline) nem faz merge.
 Só entra na análise PR aberto, fora de draft e sem revisão ativa (request changes ou aprovação): `find`, `info`
 e `list` marcam REVISAR ou PULAR: <motivo>, e `comment`, `request-changes` e `approve` recusam
@@ -50,13 +54,17 @@ def resolve_repo(arg):
 
 
 def call(method, path, body=None, params=None):
+    bearer = os.environ.get("BITBUCKET_ACCESS_TOKEN")
     email, token = os.environ.get("BITBUCKET_EMAIL"), os.environ.get("BITBUCKET_API_TOKEN")
-    if not email or not token:
-        sys.exit("BITBUCKET_EMAIL/BITBUCKET_API_TOKEN ausentes no ambiente")
+    if bearer:
+        auth = f"Bearer {bearer}"
+    elif email and token:
+        auth = "Basic " + base64.b64encode(f"{email}:{token}".encode()).decode()
+    else:
+        sys.exit("credencial ausente no ambiente: BITBUCKET_ACCESS_TOKEN, ou BITBUCKET_EMAIL + BITBUCKET_API_TOKEN")
     url = f"{API}/{path}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
-    auth = base64.b64encode(f"{email}:{token}".encode()).decode()
     # Content-Type só com corpo: POST sem corpo (approve, request-changes) com application/json volta 400
-    headers = {"Authorization": f"Basic {auth}"}
+    headers = {"Authorization": auth}
     if body:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body else None, headers=headers)

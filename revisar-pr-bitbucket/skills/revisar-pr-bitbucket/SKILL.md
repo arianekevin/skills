@@ -27,7 +27,7 @@ Se existir `~/.claude/revisar-pr-bitbucket/contexto/<slug-do-repo>.md`, leia ant
 
 ## Pré-requisitos
 
-- `BITBUCKET_EMAIL` e `BITBUCKET_API_TOKEN` no ambiente. Se o shell da sessão não os carregou, `source ~/.zshrc` (ou o arquivo onde o dev os pôs) no mesmo comando.
+- Credencial do Bitbucket no ambiente, uma das duas: `BITBUCKET_ACCESS_TOKEN` (access token do repositório; age como um usuário-bot com o nome do token e, se definido, é o que vale) ou `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (API token do Atlassian; age como o dono). Se o shell da sessão não os carregou, `source ~/.zshrc` (ou o arquivo onde o dev os pôs) no mesmo comando.
 - `YOUTRACK_API_TOKEN` (e `YOUTRACK_URL`, quando a entrada não é um link do YouTrack) para ler tickets. Se o ambiente não tiver `YOUTRACK_URL`, use o que o arquivo de contexto do projeto indicar.
 - Clone local do repo do PR, para ler o diff. Os scripts descobrem `workspace/slug` pelo `git remote` do diretório atual; fora dele, `--repo workspace/slug`.
 
