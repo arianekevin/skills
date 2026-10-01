@@ -121,18 +121,17 @@ def snapshot(pr):
     return [pr["updated_on"], pr["comment_count"], states]
 
 
-def cached_mark(key, snap, new=None):
-    """Lê (ou, com `new`, grava) a marca guardada para o PR `key` enquanto o retrato for o mesmo."""
+def load_cache():
     global _cache
     if _cache is None:
         try:
             _cache = json.loads(CACHE.read_text())
         except (OSError, ValueError):
             _cache = {}
-    if new is None:
-        hit = _cache.get(key)
-        return hit["marca"] if hit and hit["retrato"] == snap else None
-    _cache[key] = {"retrato": snap, "marca": new}
+    return _cache
+
+
+def save_cache():
     try:
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         tmp = CACHE.with_suffix(".tmp")
@@ -140,13 +139,36 @@ def cached_mark(key, snap, new=None):
         tmp.replace(CACHE)
     except OSError:
         pass
+
+
+def cached_mark(key, snap, new=None):
+    """Lê (ou, com `new`, grava) a marca guardada para o PR `key` enquanto o retrato for o mesmo."""
+    cache = load_cache()
+    if new is None:
+        hit = cache.get(key)
+        return hit["marca"] if hit and hit["retrato"] == snap else None
+    cache[key] = {"retrato": snap, "marca": new}
+    save_cache()
     return new
+
+
+def forget(base, keep=None):
+    """Tira do cache o PR que não está mais aberto. `keep` None: `base` é a chave de um PR.
+    Com `keep` (ids abertos da listagem completa do repo): sai todo PR de `base` fora dela —
+    mergeado, recusado ou de outro destino (este último só é recalculado na próxima consulta)."""
+    cache = load_cache()
+    gone = [k for k in cache if (k == base if keep is None else k.startswith(base + "/") and k.rsplit("/", 1)[1] not in keep)]
+    for k in gone:
+        del cache[k]
+    if gone:
+        save_cache()
 
 
 def mark(base, pr, pr_id=None):
     """REVISAR ou PULAR: <motivo>. Fica fora da análise o PR que não está aberto, que está em
     draft ou que tem revisão ativa sem commit nem comentário de terceiro depois dela."""
     if pr.get("state", "OPEN") != "OPEN":
+        forget(f"{base}/{pr_id or pr['id']}")
         return f"PULAR: {pr['state']}"
     if pr.get("draft"):
         return "PULAR: draft"
@@ -276,6 +298,8 @@ def main():
 
     elif a.cmd == "list":
         prs = open_prs(base, a.dest, a.author, a.reviewer)
+        if not a.author and not a.reviewer:  # listagem completa: o que não está nela saiu de aberto
+            forget(base, {str(p["id"]) for p in prs})
         n = 0
         for p in prs:
             m = mark(base, p)
