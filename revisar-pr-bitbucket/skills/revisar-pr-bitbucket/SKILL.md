@@ -84,7 +84,7 @@ Achados mais graves (❌ e brecha de segurança): confira você no código antes
 ### Re-revisão (`REVISAR: commit novo` / `comentário novo depois de <revisão>`)
 O PR já foi revisado e depois recebeu commit, comentário de quem não é o revisor, ou os dois. Parta da revisão anterior (`comments`), não do zero:
 - **Commit novo:** confira no código atual se cada achado anterior foi resolvido e revise o que os commits trouxeram com o mesmo método. Rebase ou merge do destino na branch muda o commit sem mudar o PR: compare o diff do PR antes de tratar como correção.
-- **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
+- **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se ele diz que produto respondeu a uma dúvida de produto, vale a palavra dele: o achado cai. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
 
 O comentário da re-revisão traz só o que mudou; o que já está escrito no PR não é repetido:
 - achado resolvido ou derrubado: não aparece;
@@ -109,30 +109,34 @@ Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial)
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria
-- ⚠️ resolve com ressalva: parcial, porta paralela aberta, quebra menor, decisão de produto
-- ✅ ok (ressalva mínima não conta)
+- ⚠️ resolve com ressalva: parcial, porta paralela aberta, quebra menor, decisão de produto sobre comportamento que o PR introduz
+- ✅ ok (ressalva mínima não conta; dúvida de produto sobre comportamento que o PR só preserva também não)
 - **INCONCLUSIVO**: a revisão não fechou — diff inacessível, agente que falhou, trecho crítico não lido. Diga até onde chegou, o que falta e como obter. PR inconclusivo não é aprovado nem recebe request changes.
 
 ## Passo 4 — Comentários
 
-Escreva `$OUT/comentarios.md`, uma seção por PR com ❌/⚠️, cabeçalho `## <ticket ou título curto> (#<pr>)`. PR ✅ não recebe comentário.
+Escreva `$OUT/comentarios.md`, uma seção por PR com ❌/⚠️, cabeçalho `## <ticket ou título curto> (#<pr>)`. PR ✅ não recebe comentário, salvo a nota de produto abaixo.
 
 Cada achado:
 ```
 ❌|⚠️ **<problema em uma frase>.** <evidência: arquivo:linha e cenário concreto>. <sugestão de correção que não quebra a própria correção nem outro fluxo>.
 ```
-Curto. Sem elogio, sem resumo do PR, sem estilo. Decisão de produto → "Para produto confirmar: …". Contradição no "como testar" → ℹ️ uma linha.
+Curto. Sem elogio, sem resumo do PR, sem estilo. Contradição no "como testar" → ℹ️ uma linha.
+
+Decisão de produto depende de quem trouxe o comportamento em dúvida (`git log` do arquivo):
+- **O PR introduz:** ⚠️ "Para produto confirmar: …", e o PR recebe request changes.
+- **O PR só preserva o que já existia e a pergunta está no ticket:** não bloqueia. ℹ️ uma linha, "Para produto confirmar (não bloqueia): …", e o PR segue ✅ — comentado e aprovado.
 
 ## Passo 5 — Aplicar no Bitbucket
 
 Padrão, sem perguntar:
 - **Precisa de ajuste** (❌ ou ⚠️) → posta o comentário e marca **Request changes**.
-- **Não precisa** (✅) → marca **Aprovado**. Só aprova: nunca merge, nunca decline.
+- **Não precisa** (✅) → marca **Aprovado**; com nota de produto, posta o comentário e aprova. Só aprova: nunca merge, nunca decline.
 
 Se o dev disser "não comenta", "só avalia" ou "não aplica", pare no Passo 4: mostre o que comentaria, sem tocar no Bitbucket. Achado que ele derrubar na conversa sai do arquivo, e o PR é reclassificado antes de aplicar.
 
 ```bash
-python3 $S/bitbucket.py comment $OUT/comentarios.md       # PRs com ajuste
+python3 $S/bitbucket.py comment $OUT/comentarios.md       # PRs com ajuste e ✅ com nota de produto
 python3 $S/bitbucket.py request-changes <prs com ajuste>
 python3 $S/bitbucket.py approve <prs ✅>
 ```
