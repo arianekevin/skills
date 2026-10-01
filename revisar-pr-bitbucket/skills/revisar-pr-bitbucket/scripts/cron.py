@@ -50,7 +50,7 @@ REVIEWER = os.environ.get("REVISOR_REVISOR")
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
-          "resultado no Bitbucket.")
+          "resultado no Bitbucket. Escreva o relatório final em português.")
 
 
 def now():
