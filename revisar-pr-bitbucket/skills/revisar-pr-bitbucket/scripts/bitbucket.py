@@ -4,7 +4,9 @@
 Uso:
   bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor, REVISAR/PULAR)
   bitbucket.py info PR [PR ...]                # título, branches, autor, estado, REVISAR/PULAR
-  bitbucket.py list [--dest B] [--author NOME] # PRs abertos (id, branches, autor, revisão, título)
+  bitbucket.py list [--dest B] [--author NOME] [--reviewer NOME]
+                                               # PRs abertos (id, branches, autor, revisão, título);
+                                               # --reviewer: só os que têm NOME entre os revisores
   bitbucket.py describe PR                     # descrição do PR
   bitbucket.py comments PR                     # comentários do PR (autor, arquivo:linha se inline, texto)
   bitbucket.py related PR [--grep TXT ...]     # outros PRs abertos para o mesmo destino que tocam os
@@ -142,17 +144,22 @@ def paginate(path, params):
         st, d = call("GET", nxt.split(f"{API}/", 1)[1])
 
 
-def open_prs(base, dest=None, author=None):
+def open_prs(base, dest=None, author=None, reviewer=None):
     # o estado vai dentro do `q`: com `q` presente, o parâmetro `state` solto é ignorado
     q = 'state="OPEN"' + (f' AND destination.branch.name="{dest}"' if dest else "")
     prs = paginate(base, {"q": q, "pagelen": 50,
                           "fields": "next,values.id,values.title,values.source.branch.name,values.destination.branch.name,"
                                     "values.author.display_name,values.author.nickname,values.draft,"
+                                    "values.reviewers.display_name,values.reviewers.nickname,"
                                     "values.participants.state,values.participants.user.display_name,values.participants.user.uuid"})
     if author:
         a = author.lower()
         prs = (p for p in prs if a in (p["author"].get("display_name") or "").lower()
                or a in (p["author"].get("nickname") or "").lower())
+    if reviewer:
+        r = reviewer.lower()
+        prs = (p for p in prs if any(r in (u.get("display_name") or "").lower() or r in (u.get("nickname") or "").lower()
+                                     for u in p.get("reviewers", [])))
     return list(prs)
 
 
@@ -186,6 +193,7 @@ def main():
     p = sub.add_parser("list")
     p.add_argument("--dest")
     p.add_argument("--author")
+    p.add_argument("--reviewer")
     sub.add_parser("describe").add_argument("pr")
     sub.add_parser("comments").add_argument("pr")
     p = sub.add_parser("related")
@@ -215,7 +223,7 @@ def main():
                   "|", d["author"]["display_name"], "|", mark(base, d), "|", d["title"])
 
     elif a.cmd == "list":
-        prs = open_prs(base, a.dest, a.author)
+        prs = open_prs(base, a.dest, a.author, a.reviewer)
         n = 0
         for p in prs:
             m = mark(base, p)

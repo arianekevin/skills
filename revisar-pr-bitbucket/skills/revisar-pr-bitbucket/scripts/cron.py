@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """Rodada automática da revisão de PRs, para rodar no cron sem ninguém acompanhando.
 
-Uso (crontab, de hora em hora em horário comercial; `flock` impede duas rodadas ao mesmo tempo):
-  0 8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py >> ~/revisor/cron.log 2>&1
+Uso (crontab, em horário comercial; `flock` impede duas rodadas ao mesmo tempo):
+  */30 8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py >> ~/revisor/cron.log 2>&1
+  */2  8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py --urgente >> ~/revisor/cron.log 2>&1
+
+`--urgente` é a via rápida: olha só os PRs que têm a conta do agente ($REVISOR_REVISOR) entre os
+revisores. O dev pede urgência adicionando essa conta como revisor do PR. Sem PR a revisar, sai
+sem fetch, sem chamar o Claude e sem escrever no log.
 
 O que faz:
   1. `git fetch` no clone e `bitbucket.py list --dest <destino>`. Sem PR marcado REVISAR, sai sem
@@ -22,6 +27,8 @@ Ambiente (além das credenciais que a skill pede):
   REVISOR_TENTATIVAS  tentativas sem veredito no mesmo commit antes de desistir (padrão: 3)
   REVISOR_TIMEOUT     minutos até cortar a rodada (padrão: 50)
   REVISOR_CLAUDE      comando do Claude Code (padrão: claude)
+  REVISOR_REVISOR     nome da conta do agente no Bitbucket, como aparece em "Reviewers"
+                      (obrigatório com --urgente)
   REVISOR_AVISAR      comando que recebe o aviso como último argumento (ex.: um script que manda
                       para o chat). Sem ele, o aviso fica só em $REVISOR_DIR/avisos.log.
 """
@@ -38,6 +45,8 @@ TENTATIVAS = int(os.environ.get("REVISOR_TENTATIVAS", "3"))
 TIMEOUT = int(os.environ.get("REVISOR_TIMEOUT", "50")) * 60
 CLAUDE = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
 STATE = DIR / "estado.json"
+URGENT = "--urgente" in sys.argv[1:]
+REVIEWER = os.environ.get("REVISOR_REVISOR")
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
@@ -75,7 +84,8 @@ def changed_since(base, pr, since):
 
 def to_review():
     """PRs que `bitbucket.py list` marca REVISAR: {pr: commit atual da branch de origem}."""
-    r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), "list", "--dest", DEST],
+    r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), "list", "--dest", DEST,
+                        *(["--reviewer", REVIEWER] if URGENT else [])],
                        cwd=CLONE, capture_output=True, text=True)
     if r.returncode != 0:
         warn(f"listagem falhou: {(r.stderr or r.stdout).strip()[:300]}")
@@ -94,7 +104,11 @@ def to_review():
 def main():
     if not CLONE:
         sys.exit("REVISOR_CLONE ausente: aponte para o clone do repo dos PRs")
+    if URGENT and not REVIEWER:
+        sys.exit("REVISOR_REVISOR ausente: --urgente precisa do nome da conta do agente no Bitbucket")
     os.chdir(CLONE)
+    if URGENT and not to_review():  # a cada 2 min: sem pedido de urgência, sai antes do fetch
+        return
     (DIR / "rodadas").mkdir(parents=True, exist_ok=True)
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
 
@@ -105,18 +119,20 @@ def main():
 
     before = to_review()
     # a contagem vale enquanto o PR está como na última tentativa: commit ou atividade nova zera;
-    # PR que saiu da lista some do estado
+    # PR que saiu da lista some do estado (na via rápida a lista é parcial: o que não está nela fica)
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
     state = {pr: s for pr, s in state.items()
-             if before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"])}
+             if (URGENT and pr not in before)
+             or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
     todo = [pr for pr in before if pr not in blocked][:MAX]
     if not todo:
         STATE.write_text(json.dumps(state, indent=1))
-        log(f"nada a revisar ({len(blocked)} fora das rodadas por falta de veredito)")
+        if not URGENT:
+            log(f"nada a revisar ({len(blocked)} fora das rodadas por falta de veredito)")
         return
 
-    log(f"rodada: {', '.join('#' + pr for pr in todo)}"
+    log(f"rodada{' urgente' if URGENT else ''}: {', '.join('#' + pr for pr in todo)}"
         + (f" ({len(before) - len(blocked) - len(todo)} ficam para a próxima)" if len(before) - len(blocked) > len(todo) else ""))
     out = DIR / "rodadas" / f"{datetime.datetime.now():%Y%m%d-%H%M}.log"
     with open(out, "w") as fh:
