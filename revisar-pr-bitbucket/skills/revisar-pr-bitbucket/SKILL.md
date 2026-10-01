@@ -51,7 +51,7 @@ python3 $S/bitbucket.py comments <pr>          # comentários do PR (o dev pode 
 
 Link da lista de PRs do Bitbucket: leia destino (`at=`) e autor do link e use `list`. O ticket de cada PR sai do nome da branch, do título ou da descrição.
 
-**Lista só tem PR aberto e sem revisão ativa.** Quando a entrada é uma lista (filtro/link do YouTrack, lista de PRs do Bitbucket, vários tickets ou branches), a lista pode estar errada — filtro velho, link copiado da aba de mergeados. `list`, `find` e `info` marcam cada PR como `REVISAR` ou `PULAR: <motivo>` (MERGED, DECLINED, `changes_requested (X)`, `approved (Y)`); só os `REVISAR` seguem. Não monte a lista com chamada própria à API: com `q`, o parâmetro `state` solto é ignorado e PR mergeado volta como aberto. PR pulado não é revisado, comentado nem remarcado — e `comment`/`request-changes`/`approve` recusam esse PR mesmo que ele escape. Vai para o fim do relatório como "pulado (mergeado / request changes de X / aprovado por Y)"; se a maioria da lista cair fora, diga que a lista parece errada. PR pedido sozinho pelo número, link ou branch é revisado mesmo fechado ou já revisado — o pedido é explícito: avise o estado dele e use `--isolado` na escrita.
+**Lista só tem PR aberto, fora de draft e sem revisão ativa.** Quando a entrada é uma lista (filtro/link do YouTrack, lista de PRs do Bitbucket, vários tickets ou branches), a lista pode estar errada — filtro velho, link copiado da aba de mergeados. `list`, `find` e `info` marcam cada PR como `REVISAR` ou `PULAR: <motivo>` (MERGED, DECLINED, `draft`, `changes_requested (X)`, `approved (Y)`); só os `REVISAR` seguem. Revisão anterior ao último commit do PR, ou a um comentário de quem não é o revisor, não conta como ativa: o PR volta como `REVISAR: commit novo depois de <revisão>` (ou `comentário novo`) e é re-revisado (ver "Re-revisão" no Passo 2). Não monte a lista com chamada própria à API: com `q`, o parâmetro `state` solto é ignorado e PR mergeado volta como aberto. PR pulado não é revisado, comentado nem remarcado — e `comment`/`request-changes`/`approve` recusam esse PR mesmo que ele escape. Vai para o fim do relatório como "pulado (mergeado / draft / request changes de X / aprovado por Y)"; se a maioria da lista cair fora, diga que a lista parece errada. PR pedido sozinho pelo número, link ou branch é revisado mesmo fechado ou já revisado — o pedido é explícito: avise o estado dele e use `--isolado` na escrita.
 
 Para cada ticket, ache o código:
 - Branch do PR → `git diff $(git merge-base origin/<destino> origin/<branch>) origin/<branch>`, com o destino real do PR.
@@ -60,7 +60,7 @@ Para cada ticket, ache o código:
 - PR de branch agregadora (`qa`, `release`…): tire os tickets das mensagens de commit, baixe com `youtrack.py --ids` e revise commit a commit, conferindo o estado final na branch. Um comentário só no PR, com uma linha por ticket.
 - PR sem ticket: a pergunta 1 vira "faz o que a descrição do PR promete?".
 
-Diga em uma linha quantos tickets, quantos com PR, quantos pulados (fechados ou com revisão ativa), quais sem PR ou empilhados.
+Diga em uma linha quantos tickets, quantos com PR, quantos pulados (fechados, em draft ou com revisão ativa), quais sem PR ou empilhados.
 
 ## Passo 2 — Revisar
 
@@ -80,6 +80,19 @@ Poucos PRs pequenos (até ~4): revise direto. Mais que isso, ou um PR grande: su
 - "Quebra" é contra o que o cliente usa hoje (produção, regra de produto), não contra um estado intermediário da branch de destino criado por outro PR ainda não liberado. Antes de chamar de regressão, confira se aquilo já funcionava (`git log` do arquivo).
 
 Achados mais graves (❌ e brecha de segurança): confira você no código antes de reportar, mesmo quando vieram de um agente.
+
+### Re-revisão (`REVISAR: commit novo` / `comentário novo depois de <revisão>`)
+O PR já foi revisado e depois recebeu commit, comentário de quem não é o revisor, ou os dois. Parta da revisão anterior (`comments`), não do zero:
+- **Commit novo:** confira no código atual se cada achado anterior foi resolvido e revise o que os commits trouxeram com o mesmo método. Rebase ou merge do destino na branch muda o commit sem mudar o PR: compare o diff do PR antes de tratar como correção.
+- **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
+
+O comentário da re-revisão traz só o que mudou; o que já está escrito no PR não é repetido:
+- achado resolvido ou derrubado: não aparece;
+- achado novo: formato normal do Passo 4;
+- resposta a contestação: como acima;
+- nada mudou nos achados (rebase, commit que não toca neles): uma linha — "Revisado de novo em `<hash curto>`: os achados acima continuam; aguardando correção."
+
+Veredito pelo estado atual do PR, aplicado como em qualquer outro: sem achado de pé, aprova (substitui o request changes anterior do mesmo usuário); com achado de pé, comenta e marca request changes. Re-revisão que mantém achado **sempre** deixa comentário, nem que seja a linha acima: é ele que registra que o commit ou o comentário novo já foi visto — sem ele o PR volta como `REVISAR` na próxima listagem.
 
 ### Antes de fechar ❌ ou ⚠️: procure a explicação que falta
 O que parece faltar pode já estar respondido ou estar em outro PR. Só para PR com ❌/⚠️ (não em todo PR):

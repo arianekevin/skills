@@ -18,9 +18,11 @@ Repo: --repo workspace/slug, ou $BITBUCKET_REPO, ou o remote `origin` do git no 
 Credenciais: $BITBUCKET_EMAIL e $BITBUCKET_API_TOKEN (API token do Atlassian com
 read:pullrequest:bitbucket + write:pullrequest:bitbucket).
 Nunca recusa (decline) nem faz merge.
-Só entra na análise PR aberto e sem revisão ativa (request changes ou aprovação): `find`, `info`
+Só entra na análise PR aberto, fora de draft e sem revisão ativa (request changes ou aprovação): `find`, `info`
 e `list` marcam REVISAR ou PULAR: <motivo>, e `comment`, `request-changes` e `approve` recusam
-o resto. Exceção: PR pedido sozinho pelo número, com `--isolado` na escrita.
+o resto. Revisão anterior ao último commit do PR, ou a um comentário de quem não é o revisor,
+não conta como ativa: o PR volta como `REVISAR: commit novo depois de <revisão>` (ou
+`comentário novo`). Exceção: PR pedido sozinho pelo número, com `--isolado` na escrita.
 
 Formato do ARQUIVO.md para `comment`: seções `## <rótulo> (#<pr>)`. Seção sem número
 de PR é ignorada e listada no fim.
@@ -74,29 +76,56 @@ def review(pr):
     return "sem revisão"
 
 
-def skip_reason(pr):
-    """Por que o PR fica fora da análise: não está aberto ou já tem revisão ativa. None = revisar."""
+def news_after_review(base, pr_id, reviewers):
+    """O que chegou ao PR depois da última revisão: (commit novo?, comentário novo?).
+    Revisão = aprovação, request changes ou comentário de um revisor (`reviewers`: uuids de quem
+    tem marca ativa) — a resposta do revisor também fecha o que veio antes dela.
+    A activity vem da mais nova para a mais antiga; cada `update` traz o commit de origem daquele momento."""
+    head, commented, reviewed = None, False, False
+    for v in paginate(f"{base}/{pr_id}/activity", {"pagelen": 50}):
+        by_reviewer = "comment" in v and (v["comment"].get("user") or {}).get("uuid") in reviewers
+        if "approval" in v or "changes_requested" in v or by_reviewer:
+            if head is None:  # nenhum update depois da revisão
+                return False, commented
+            reviewed = True
+        elif "update" in v:
+            h = ((v["update"].get("source") or {}).get("commit") or {}).get("hash")
+            if reviewed:  # primeiro update anterior à revisão: o commit que foi revisado
+                return h != head, commented
+            head = head or h
+        elif "comment" in v and not reviewed:
+            commented = True
+    return False, False
+
+
+def mark(base, pr, pr_id=None):
+    """REVISAR ou PULAR: <motivo>. Fica fora da análise o PR que não está aberto, que está em
+    draft ou que tem revisão ativa sem commit nem comentário de terceiro depois dela."""
     if pr.get("state", "OPEN") != "OPEN":
-        return pr["state"]
+        return f"PULAR: {pr['state']}"
+    if pr.get("draft"):
+        return "PULAR: draft"
     r = review(pr)
-    return None if r == "sem revisão" else r
-
-
-def mark(pr):
-    reason = skip_reason(pr)
-    return "REVISAR" if reason is None else f"PULAR: {reason}"
+    if r == "sem revisão":
+        return "REVISAR"
+    reviewers = {p["user"].get("uuid") for p in pr.get("participants", []) if p.get("state")}
+    commit, comment = news_after_review(base, pr_id or pr["id"], reviewers)
+    if commit or comment:
+        news = " e ".join(n for n, on in (("commit", commit), ("comentário", comment)) if on)
+        return f"REVISAR: {news} novo depois de {r}"
+    return f"PULAR: {r}"
 
 
 def guard(base, pr, isolated=False):
-    """Escrita só em PR aberto e sem revisão ativa. `isolated`: o dev pediu este PR sozinho, pelo número."""
+    """Escrita só em PR que `mark` manda revisar. `isolated`: o dev pediu este PR sozinho, pelo número."""
     if isolated:
         return True
-    st, d = call("GET", f"{base}/{pr}", params={"fields": "state,participants.state,participants.user.display_name"})
+    st, d = call("GET", f"{base}/{pr}", params={"fields": "state,draft,participants.state,participants.user.display_name,participants.user.uuid"})
     if st != 200:
         print(pr, f"ERRO {st} {d}"); return False
-    reason = skip_reason(d)
-    if reason:
-        print(pr, f"PULADO: {reason}"); return False
+    m = mark(base, d, pr)
+    if m.startswith("PULAR"):
+        print(pr, m.replace("PULAR", "PULADO", 1)); return False
     return True
 
 
@@ -118,8 +147,8 @@ def open_prs(base, dest=None, author=None):
     q = 'state="OPEN"' + (f' AND destination.branch.name="{dest}"' if dest else "")
     prs = paginate(base, {"q": q, "pagelen": 50,
                           "fields": "next,values.id,values.title,values.source.branch.name,values.destination.branch.name,"
-                                    "values.author.display_name,values.author.nickname,"
-                                    "values.participants.state,values.participants.user.display_name"})
+                                    "values.author.display_name,values.author.nickname,values.draft,"
+                                    "values.participants.state,values.participants.user.display_name,values.participants.user.uuid"})
     if author:
         a = author.lower()
         prs = (p for p in prs if a in (p["author"].get("display_name") or "").lower()
@@ -172,9 +201,9 @@ def main():
     if a.cmd == "find":
         for b in a.branches:
             st, d = call("GET", base, params={"q": f'source.branch.name="{b}" AND state="OPEN"',
-                                               "fields": "values.id,values.destination.branch.name,values.author.display_name,"
-                                                         "values.participants.state,values.participants.user.display_name"})
-            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], mark(p)) for p in d["values"]] or "sem PR aberto"
+                                               "fields": "values.id,values.draft,values.destination.branch.name,values.author.display_name,"
+                                                         "values.participants.state,values.participants.user.display_name,values.participants.user.uuid"})
+            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], mark(base, p)) for p in d["values"]] or "sem PR aberto"
                   if st == 200 else f"ERRO {st} {d}")
 
     elif a.cmd == "info":
@@ -183,15 +212,17 @@ def main():
             if st != 200:
                 print(pr, "ERRO", st, d); continue
             print(pr, "|", d["state"], "|", d["source"]["branch"]["name"], "->", d["destination"]["branch"]["name"],
-                  "|", d["author"]["display_name"], "|", mark(d), "|", d["title"])
+                  "|", d["author"]["display_name"], "|", mark(base, d), "|", d["title"])
 
     elif a.cmd == "list":
         prs = open_prs(base, a.dest, a.author)
+        n = 0
         for p in prs:
+            m = mark(base, p)
+            n += m.startswith("REVISAR")
             print(p["id"], "|", p["source"]["branch"]["name"], "->", p["destination"]["branch"]["name"],
-                  "|", p["author"]["display_name"], "|", mark(p), "|", p["title"])
-        n = sum(1 for p in prs if skip_reason(p) is None)
-        print(f"{len(prs)} PR(s) aberto(s); {n} a revisar, {len(prs) - n} pulado(s) por revisão ativa")
+                  "|", p["author"]["display_name"], "|", m, "|", p["title"])
+        print(f"{len(prs)} PR(s) aberto(s); {n} a revisar, {len(prs) - n} pulado(s) por draft ou revisão ativa")
 
     elif a.cmd == "describe":
         st, d = call("GET", f"{base}/{a.pr}", params={"fields": "description"})
