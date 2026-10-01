@@ -162,7 +162,7 @@ def main():
                  f"ou mudança de estado. "
                  f"Última rodada: {out}")
     STATE.write_text(json.dumps(state, indent=1))
-    log(f"fim ({end}): {done} de {len(todo)} com veredito aplicado; saída em {out}")
+    log(f"fim ({end}): {done} de {len(todo)} saíram do REVISAR; saída em {out}")
 
 
 if __name__ == "__main__":

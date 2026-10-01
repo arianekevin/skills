@@ -33,7 +33,7 @@ não conta como ativa: o PR volta como `REVISAR: commit novo depois de <revisão
 Formato do ARQUIVO.md para `comment`: seções `## <rótulo> (#<pr>)`. Seção sem número
 de PR é ignorada e listada no fim.
 """
-import argparse, base64, json, os, pathlib, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import argparse, base64, datetime, json, os, pathlib, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 
 API = "https://api.bitbucket.org/2.0/repositories"
 # marca já calculada de cada PR, para não reler a activity de PR que não mudou
@@ -93,22 +93,29 @@ def news_after_review(base, pr_id, reviewers):
     """O que chegou ao PR depois da última revisão: (commit novo?, comentário novo?).
     Revisão = aprovação, request changes ou comentário de um revisor (`reviewers`: uuids de quem
     tem marca ativa) — a resposta do revisor também fecha o que veio antes dela.
-    A activity vem da mais nova para a mais antiga; cada `update` traz o commit de origem daquele momento."""
-    head, commented, reviewed = None, False, False
+    Compara pela data de cada item, não pela posição na activity: o feed reordena o comentário que
+    foi atualizado, e um comentário antigo do revisor sobe acima da resposta do dev.
+    Cada `update` traz o commit de origem daquele momento."""
+    when = datetime.datetime.fromisoformat
+    reviewed, comments, updates = None, [], []
     for v in paginate(f"{base}/{pr_id}/activity", {"pagelen": 50}):
-        by_reviewer = "comment" in v and (v["comment"].get("user") or {}).get("uuid") in reviewers
-        if "approval" in v or "changes_requested" in v or by_reviewer:
-            if head is None:  # nenhum update depois da revisão
-                return False, commented
-            reviewed = True
+        if "approval" in v or "changes_requested" in v:
+            d = when((v.get("approval") or v["changes_requested"])["date"])
+            reviewed = max(reviewed or d, d)
+        elif "comment" in v:
+            d = when(v["comment"]["created_on"])
+            if (v["comment"].get("user") or {}).get("uuid") in reviewers:
+                reviewed = max(reviewed or d, d)
+            else:
+                comments.append(d)
         elif "update" in v:
-            h = ((v["update"].get("source") or {}).get("commit") or {}).get("hash")
-            if reviewed:  # primeiro update anterior à revisão: o commit que foi revisado
-                return h != head, commented
-            head = head or h
-        elif "comment" in v and not reviewed:
-            commented = True
-    return False, False
+            updates.append((when(v["update"]["date"]), ((v["update"].get("source") or {}).get("commit") or {}).get("hash")))
+    if reviewed is None:
+        return False, False
+    updates.sort(key=lambda u: u[0])
+    before = [h for d, h in updates if d <= reviewed]  # o último é o commit que foi revisado
+    after = [h for d, h in updates if d > reviewed]
+    return bool(before and after) and after[-1] != before[-1], any(d > reviewed for d in comments)
 
 
 def snapshot(pr):

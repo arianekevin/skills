@@ -84,7 +84,7 @@ Achados mais graves (❌ e brecha de segurança): confira você no código antes
 ### Re-revisão (`REVISAR: commit novo` / `comentário novo depois de <revisão>`)
 O PR já foi revisado e depois recebeu commit, comentário de quem não é o revisor, ou os dois. Parta da revisão anterior (`comments`), não do zero:
 - **Commit novo:** confira no código atual se cada achado anterior foi resolvido e revise o que os commits trouxeram com o mesmo método. Rebase ou merge do destino na branch muda o commit sem mudar o PR: compare o diff do PR antes de tratar como correção.
-- **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se ele diz que produto respondeu a uma dúvida de produto, vale a palavra dele: o achado cai. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
+- **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se ele afirma algo que o código não mostra (produto respondeu, o dado foi corrigido direto no banco, a infra ajustou), vale a palavra dele: o achado cai, sem pedir prova. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
 
 O comentário da re-revisão traz só o que mudou; o que já está escrito no PR não é repetido:
 - achado resolvido ou derrubado: não aparece;
