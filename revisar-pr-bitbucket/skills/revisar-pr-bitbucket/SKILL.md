@@ -44,14 +44,14 @@ python3 $S/youtrack.py --url '<link do youtrack>' --out $OUT/issues   # ou --que
 cd <clone do repo> && git fetch origin --prune -q
 python3 $S/bitbucket.py list --dest <branch> [--author <nome>]   # PRs abertos (entrada = lista do Bitbucket)
 python3 $S/bitbucket.py find <branch> ...      # PR aberto de cada branch
-python3 $S/bitbucket.py info <pr> ...          # origem -> destino, autor, revisão ativa
+python3 $S/bitbucket.py info <pr> ...          # estado, origem -> destino, autor, REVISAR/PULAR
 python3 $S/bitbucket.py describe <pr>          # descrição do PR
 python3 $S/bitbucket.py comments <pr>          # comentários do PR (o dev pode já ter respondido ali)
 ```
 
 Link da lista de PRs do Bitbucket: leia destino (`at=`) e autor do link e use `list`. O ticket de cada PR sai do nome da branch, do título ou da descrição.
 
-**Varredura de lista não repassa PR já revisado.** Quando a entrada é uma lista (filtro/link do YouTrack, lista de PRs do Bitbucket, vários tickets ou branches), PR com revisão ativa — `changes_requested` ou `approved` na coluna de revisão do `list`/`find`/`info` — sai da lista: não é revisado, comentado nem remarcado. Vai para o fim do relatório como "pulado (request changes de X / aprovado por Y)". PR pedido pelo número, link ou branch isolada é revisado mesmo assim: aí o pedido é explícito.
+**Lista só tem PR aberto e sem revisão ativa.** Quando a entrada é uma lista (filtro/link do YouTrack, lista de PRs do Bitbucket, vários tickets ou branches), a lista pode estar errada — filtro velho, link copiado da aba de mergeados. `list`, `find` e `info` marcam cada PR como `REVISAR` ou `PULAR: <motivo>` (MERGED, DECLINED, `changes_requested (X)`, `approved (Y)`); só os `REVISAR` seguem. Não monte a lista com chamada própria à API: com `q`, o parâmetro `state` solto é ignorado e PR mergeado volta como aberto. PR pulado não é revisado, comentado nem remarcado — e `comment`/`request-changes`/`approve` recusam esse PR mesmo que ele escape. Vai para o fim do relatório como "pulado (mergeado / request changes de X / aprovado por Y)"; se a maioria da lista cair fora, diga que a lista parece errada. PR pedido sozinho pelo número, link ou branch é revisado mesmo fechado ou já revisado — o pedido é explícito: avise o estado dele e use `--isolado` na escrita.
 
 Para cada ticket, ache o código:
 - Branch do PR → `git diff $(git merge-base origin/<destino> origin/<branch>) origin/<branch>`, com o destino real do PR.
@@ -60,7 +60,7 @@ Para cada ticket, ache o código:
 - PR de branch agregadora (`qa`, `release`…): tire os tickets das mensagens de commit, baixe com `youtrack.py --ids` e revise commit a commit, conferindo o estado final na branch. Um comentário só no PR, com uma linha por ticket.
 - PR sem ticket: a pergunta 1 vira "faz o que a descrição do PR promete?".
 
-Diga em uma linha quantos tickets, quantos com PR, quantos pulados por revisão ativa, quais sem PR ou empilhados.
+Diga em uma linha quantos tickets, quantos com PR, quantos pulados (fechados ou com revisão ativa), quais sem PR ou empilhados.
 
 ## Passo 2 — Revisar
 
@@ -92,7 +92,7 @@ O que parece faltar pode já estar respondido ou estar em outro PR. Só para PR 
 
 ## Passo 3 — Entregar no chat
 
-Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados por revisão ativa (quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados e dependências entre PRs (uma linha cada). Achado anterior ao PR, fora do escopo, só entra se for brecha de segurança ou quebra grave; o resto não é reportado.
+Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados (mergeado, recusado, ou revisão ativa e quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados e dependências entre PRs (uma linha cada). Achado anterior ao PR, fora do escopo, só entra se for brecha de segurança ou quebra grave; o resto não é reportado.
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria
@@ -125,4 +125,4 @@ python3 $S/bitbucket.py approve <prs ✅>
 ```
 Releia o arquivo antes de postar (o dev pode ter editado). Confira a saída de cada chamada; ERRO em algum PR é dito com o número do PR que ficou sem ação.
 
-Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada / pulado: revisão ativa).
+Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada / pulado: fechado ou revisão ativa).

@@ -2,8 +2,8 @@
 """Operações mínimas no Bitbucket Cloud para a revisão de PRs.
 
 Uso:
-  bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor, revisão)
-  bitbucket.py info PR [PR ...]                # título, branches, autor, estado, revisão
+  bitbucket.py find BRANCH [BRANCH ...]        # PR aberto de cada branch (id, destino, autor, REVISAR/PULAR)
+  bitbucket.py info PR [PR ...]                # título, branches, autor, estado, REVISAR/PULAR
   bitbucket.py list [--dest B] [--author NOME] # PRs abertos (id, branches, autor, revisão, título)
   bitbucket.py describe PR                     # descrição do PR
   bitbucket.py comments PR                     # comentários do PR (autor, arquivo:linha se inline, texto)
@@ -18,6 +18,9 @@ Repo: --repo workspace/slug, ou $BITBUCKET_REPO, ou o remote `origin` do git no 
 Credenciais: $BITBUCKET_EMAIL e $BITBUCKET_API_TOKEN (API token do Atlassian com
 read:pullrequest:bitbucket + write:pullrequest:bitbucket).
 Nunca recusa (decline) nem faz merge.
+Só entra na análise PR aberto e sem revisão ativa (request changes ou aprovação): `find`, `info`
+e `list` marcam REVISAR ou PULAR: <motivo>, e `comment`, `request-changes` e `approve` recusam
+o resto. Exceção: PR pedido sozinho pelo número, com `--isolado` na escrita.
 
 Formato do ARQUIVO.md para `comment`: seções `## <rótulo> (#<pr>)`. Seção sem número
 de PR é ignorada e listada no fim.
@@ -68,6 +71,32 @@ def review(pr):
     return "sem revisão"
 
 
+def skip_reason(pr):
+    """Por que o PR fica fora da análise: não está aberto ou já tem revisão ativa. None = revisar."""
+    if pr.get("state", "OPEN") != "OPEN":
+        return pr["state"]
+    r = review(pr)
+    return None if r == "sem revisão" else r
+
+
+def mark(pr):
+    reason = skip_reason(pr)
+    return "REVISAR" if reason is None else f"PULAR: {reason}"
+
+
+def guard(base, pr, isolated=False):
+    """Escrita só em PR aberto e sem revisão ativa. `isolated`: o dev pediu este PR sozinho, pelo número."""
+    if isolated:
+        return True
+    st, d = call("GET", f"{base}/{pr}", params={"fields": "state,participants.state,participants.user.display_name"})
+    if st != 200:
+        print(pr, f"ERRO {st} {d}"); return False
+    reason = skip_reason(d)
+    if reason:
+        print(pr, f"PULADO: {reason}"); return False
+    return True
+
+
 def paginate(path, params):
     """Todas as páginas de uma listagem da API (segue `next`)."""
     st, d = call("GET", path, params=params)
@@ -106,7 +135,9 @@ def changed_files(dest, branch):
     return None if out is None else set(filter(None, out.splitlines()))
 
 
-def post_state(base, pr, action):
+def post_state(base, pr, action, isolated=False):
+    if not guard(base, pr, isolated):
+        return
     st, d = call("POST", f"{base}/{pr}/{action}")
     if st == 400:  # logo após comentar o Bitbucket às vezes devolve 400; a segunda tentativa passa
         time.sleep(3)
@@ -128,18 +159,19 @@ def main():
     p = sub.add_parser("related")
     p.add_argument("pr")
     p.add_argument("--grep", action="append", default=[])
-    sub.add_parser("comment").add_argument("file")
-    sub.add_parser("request-changes").add_argument("prs", nargs="+")
-    sub.add_parser("approve").add_argument("prs", nargs="+")
+    for name, arg in (("comment", "file"), ("request-changes", "prs"), ("approve", "prs")):
+        p = sub.add_parser(name)
+        p.add_argument(arg, nargs=None if arg == "file" else "+")
+        p.add_argument("--isolado", action="store_true", help="PR pedido sozinho pelo número: sem a trava")
     a = ap.parse_args()
     base = f"{resolve_repo(a.repo)}/pullrequests"
 
     if a.cmd == "find":
         for b in a.branches:
-            st, d = call("GET", base, params={"q": f'source.branch.name="{b}"', "state": "OPEN",
+            st, d = call("GET", base, params={"q": f'source.branch.name="{b}" AND state="OPEN"',
                                                "fields": "values.id,values.destination.branch.name,values.author.display_name,"
                                                          "values.participants.state,values.participants.user.display_name"})
-            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], review(p)) for p in d["values"]]
+            print(b, [(p["id"], p["destination"]["branch"]["name"], p["author"]["display_name"], mark(p)) for p in d["values"]] or "sem PR aberto"
                   if st == 200 else f"ERRO {st} {d}")
 
     elif a.cmd == "info":
@@ -148,14 +180,15 @@ def main():
             if st != 200:
                 print(pr, "ERRO", st, d); continue
             print(pr, "|", d["state"], "|", d["source"]["branch"]["name"], "->", d["destination"]["branch"]["name"],
-                  "|", d["author"]["display_name"], "|", review(d), "|", d["title"])
+                  "|", d["author"]["display_name"], "|", mark(d), "|", d["title"])
 
     elif a.cmd == "list":
         prs = open_prs(base, a.dest, a.author)
         for p in prs:
             print(p["id"], "|", p["source"]["branch"]["name"], "->", p["destination"]["branch"]["name"],
-                  "|", p["author"]["display_name"], "|", review(p), "|", p["title"])
-        print(f"{len(prs)} PR(s) aberto(s)")
+                  "|", p["author"]["display_name"], "|", mark(p), "|", p["title"])
+        n = sum(1 for p in prs if skip_reason(p) is None)
+        print(f"{len(prs)} PR(s) aberto(s); {n} a revisar, {len(prs) - n} pulado(s) por revisão ativa")
 
     elif a.cmd == "describe":
         st, d = call("GET", f"{base}/{a.pr}", params={"fields": "description"})
@@ -214,6 +247,8 @@ def main():
             m = re.search(r"#(\d+)", head)
             if not m or not body.strip():
                 skipped.append(head.strip()); continue
+            if not guard(base, m.group(1), a.isolado):
+                continue
             st, d = call("POST", f"{base}/{m.group(1)}/comments", body={"content": {"raw": body.strip()}})
             print(head.strip(), "ok" if st in (200, 201) else f"ERRO {st} {d}")
         if skipped:
@@ -221,11 +256,11 @@ def main():
 
     elif a.cmd == "request-changes":
         for pr in a.prs:
-            post_state(base, pr, "request-changes")
+            post_state(base, pr, "request-changes", a.isolado)
 
     elif a.cmd == "approve":
         for pr in a.prs:
-            post_state(base, pr, "approve")
+            post_state(base, pr, "approve", a.isolado)
 
 
 if __name__ == "__main__":
