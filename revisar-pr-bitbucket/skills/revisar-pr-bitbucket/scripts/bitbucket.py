@@ -51,8 +51,11 @@ def call(method, path, body=None, params=None):
         sys.exit("BITBUCKET_EMAIL/BITBUCKET_API_TOKEN ausentes no ambiente")
     url = f"{API}/{path}" + (f"?{urllib.parse.urlencode(params)}" if params else "")
     auth = base64.b64encode(f"{email}:{token}".encode()).decode()
-    req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body else None,
-                                 headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"})
+    # Content-Type só com corpo: POST sem corpo (approve, request-changes) com application/json volta 400
+    headers = {"Authorization": f"Basic {auth}"}
+    if body:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body else None, headers=headers)
     try:
         r = urllib.request.urlopen(req)
         raw = r.read()
