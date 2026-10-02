@@ -168,8 +168,8 @@ def main():
     prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK)
     with open(out, "w") as fh:
         try:
-            r = subprocess.run([*CLAUDE, "-p", prompt],
-                               cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT)
+            r = subprocess.run([*CLAUDE, "-p", prompt], cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT,
+                               env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
             end = f"claude saiu com {r.returncode}"
         except subprocess.TimeoutExpired:
             end = f"cortada aos {TIMEOUT // 60} min"

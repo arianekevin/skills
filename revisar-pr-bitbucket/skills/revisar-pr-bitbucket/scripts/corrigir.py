@@ -33,6 +33,12 @@ Ambiente (além do que cron.py já usa):
   CORRETOR_VERIFICAR  comando de verificação que o corretor deve rodar na cópia (ex.: um script
                       que compila e roda os testes); entra no pedido
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
+  CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
+                      requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
+                      e o comentário do que foi corrigido saem com o nome desse token, e a aprovação ou
+                      o request changes continuam saindo com a credencial do revisor. O token não chega
+                      a nenhuma sessão do Claude. Sem ele, o push usa o remoto do clone e tudo o que é
+                      escrito no PR sai com a credencial do revisor.
 """
 import argparse, datetime, json, os, pathlib, re, shlex, shutil, subprocess, sys
 
@@ -49,6 +55,7 @@ VOLTAS = int(os.environ.get("CORRETOR_VOLTAS", "5"))
 MAX = int(os.environ.get("CORRETOR_MAX", "1"))
 TIMEOUT = int(os.environ.get("CORRETOR_TIMEOUT", "40")) * 60
 VERIFY = os.environ.get("CORRETOR_VERIFICAR")
+FIXER_TOKEN = os.environ.get("CORRETOR_BITBUCKET_TOKEN")
 TICKET = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
 SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|BITBUCKET_|YOUTRACK_|TEAMCITY_")
 
@@ -125,10 +132,14 @@ def tickets(d, issues):
                        cwd=CLONE, capture_output=True, text=True)
 
 
-def write(cmd, *args):
-    """Chama bitbucket.py para escrever no PR; devolve (deu certo?, saída)."""
+def write(cmd, *args, fixer=False):
+    """Chama bitbucket.py para escrever no PR; devolve (deu certo?, saída).
+    `fixer`: escreve com a identidade do corretor, quando ele tem token próprio."""
+    env = os.environ.copy()
+    if fixer and FIXER_TOKEN:
+        env["BITBUCKET_ACCESS_TOKEN"] = FIXER_TOKEN
     r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, *args, "--isolado"],
-                       cwd=CLONE, capture_output=True, text=True)
+                       cwd=CLONE, env=env, capture_output=True, text=True)
     out = (r.stdout + r.stderr).strip()
     return r.returncode == 0 and out.endswith("ok"), out
 
@@ -187,7 +198,8 @@ def correct(base, pr, dry):
 
         (work / "veredito.json").unlink(missing_ok=True)
         end = session(REVISOR, ASK_GATE.format(v=v, last=" — é a última volta" if v == VOLTAS else "", **fmt),
-                      tree, os.environ.copy(), DIR / "rodadas" / f"{stamp}-portao-{pr}-{v}.log")
+                      tree, {k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"},
+                      DIR / "rodadas" / f"{stamp}-portao-{pr}-{v}.log")
         try:
             verdict = json.loads((work / "veredito.json").read_text())
             verdict["estado"] = str(verdict.get("estado", "")).strip().lower()
@@ -229,16 +241,20 @@ def publish(pr, branch, head, tree, work, verdict, dry):
             return
         commit = git("rev-parse", "--short=12", "HEAD", cwd=tree)[1]
 
-    parts = []
+    # o que o corretor diz (o que mudou) e o que o revisor diz (o que ficou para o dev)
+    mine, theirs = [], []
     if commit:
-        parts.append(f"🔧 **Corrigido automaticamente no commit `{commit}`.**\n" + "\n".join(f"- {x}" for x in fixed))
+        mine.append(f"🔧 **Corrigido automaticamente no commit `{commit}`.**\n" + "\n".join(f"- {x}" for x in fixed))
     if state != "aprovado" and rest:
-        parts.append(("**O que ficou para você:**\n\n" if commit else "") + rest)
+        theirs.append(rest)
     if notes:
-        parts.append("ℹ️ **Ficou de fora, não bloqueia:**\n" + "\n".join(f"- {x}" for x in notes))
+        (mine if commit else theirs).append("ℹ️ **Ficou de fora, não bloqueia:**\n" + "\n".join(f"- {x}" for x in notes))
     if commit:
-        parts.append("Puxe a branch antes de continuar (`git pull --rebase`).")
-    text = "\n\n".join(parts)
+        mine.append("Puxe a branch antes de continuar (`git pull --rebase`).")
+    if not FIXER_TOKEN and mine and theirs:  # uma identidade só: um comentário só
+        mine, theirs = [], [*mine, "**O que ficou para você:**\n\n" + "\n\n".join(theirs)]
+    posts = [(who, f"{title}\n" + "\n\n".join(parts) + "\n", work / name)
+             for who, parts, name in ((True, mine, "comentario-corretor.md"), (False, theirs, "comentario.md")) if parts]
     # PR reaberto sem nenhum veredito do portão: o achados.md ainda é o histórico de comentários do
     # próprio PR, e o request changes já está lá. Não há nada novo a dizer.
     reopened = json.loads((work / "marca.json").read_text()).get("reaberto")
@@ -246,12 +262,12 @@ def publish(pr, branch, head, tree, work, verdict, dry):
         log(f"#{pr}: sem veredito do portão; o PR fica como estava")
         return
     final = "approve" if state == "aprovado" else "request-changes"
-    plan = f"{state}: " + ", ".join(x for x in (f"push do commit {commit}" if commit else "", "comentário" if text else "",
+    plan = f"{state}: " + ", ".join(x for x in (f"push do commit {commit}" if commit else "", f"{len(posts)} comentário(s)" if posts else "",
                                               "aprovação" if final == "approve" else "request changes") if x)
+    for _, text, path in posts:
+        path.write_text(text)
     if dry:
         log(f"#{pr}: ENSAIO, publicaria — {plan}. Cópia em {tree}, arquivos em {work}")
-        if text:
-            (work / "comentario.md").write_text(f"{title}\n{text}\n")
         return
 
     if commit:
@@ -259,15 +275,19 @@ def publish(pr, branch, head, tree, work, verdict, dry):
         if git("rev-parse", "--short=12", f"origin/{branch}")[1] != head:
             log(f"#{pr}: a branch andou durante a correção; nada publicado, volta para a triagem")
             return
-        rc, out = git("push", "origin", f"HEAD:refs/heads/{branch}", cwd=tree)
+        if FIXER_TOKEN:  # o token vem do ambiente pelo helper, não entra na linha de comando
+            helper = "!f() { echo username=x-token-auth; echo \"password=$CORRETOR_BITBUCKET_TOKEN\"; }; f"
+            rc, out = git("-c", "credential.helper=", "-c", f"credential.helper={helper}", "push",
+                          f"https://bitbucket.org/{bitbucket.resolve_repo(None)}.git", f"HEAD:refs/heads/{branch}", cwd=tree)
+        else:
+            rc, out = git("push", "origin", f"HEAD:refs/heads/{branch}", cwd=tree)
         if rc != 0:
             log(f"#{pr}: push falhou, nada publicado: {out[:200]}")
             return
     done = [f"push do commit {commit}"] if commit else []
-    if text:
-        (work / "comentario.md").write_text(f"{title}\n{text}\n")
-        ok, out = write("comment", str(work / "comentario.md"))
-        done.append("comentário" if ok else f"comentário FALHOU ({out[:120]})")
+    for who, _, path in posts:  # o do corretor primeiro: a marca do revisor fecha a conversa
+        ok, out = write("comment", str(path), fixer=who)
+        done.append(f"comentário do {'corretor' if who else 'revisor'}" if ok else f"comentário FALHOU ({out[:120]})")
     ok, out = write(final, pr)
     done.append(("aprovação" if final == "approve" else "request changes") if ok else f"{final} FALHOU ({out[:120]})")
     log(f"#{pr}: {state} — " + ", ".join(done))
