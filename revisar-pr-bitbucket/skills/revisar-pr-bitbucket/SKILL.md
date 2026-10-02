@@ -178,6 +178,7 @@ O diretório atual é uma cópia da branch do PR com a mudança do corretor **ai
 
 Confira achado por achado, pela resposta dele:
 - **CORRIGIDO:** leia a mudança no código, não só a descrição. Resolve o achado em todos os caminhos? A mudança quebra algo ou abre brecha (método do Passo 2)?
+- **Teste alterado pelo corretor:** só passa se o teste afirmava exatamente o comportamento que o ticket manda mudar e a asserção nova é a do ticket. Teste apagado, afrouxado ou ignorado, ou asserção trocada sobre outro comportamento, reprova: o que quebrou ali é efeito colateral da mudança.
 - **DISCORDO:** confira a evidência no código. Procede: o achado cai. Não procede: responda em cima do argumento, com `arquivo:linha`.
 - **DECISÃO:** é mesmo uma escolha que ninguém fez? Se o ticket ou o código já respondem, diga onde; o achado volta para ele corrigir.
 

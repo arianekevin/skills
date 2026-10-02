@@ -37,8 +37,10 @@ Ambiente (além do que cron.py já usa):
   CORRETOR_SUITE      comando que roda a suíte completa de testes na cópia e imprime, um por linha,
                       os testes que falharam; saída diferente de 0 = a suíte não rodou (não compilou).
                       Com ele, a suíte roda antes da correção e de novo depois que o revisor aceita a
-                      mudança: teste que passava e passou a falhar volta para o corretor como achado,
-                      e sem resolver nada é publicado. Teste que já falhava na branch não conta.
+                      mudança: teste que passava e passou a falhar volta para o corretor como achado
+                      (ele arruma o teste, se o teste fixava o comportamento que o ticket muda, ou
+                      conserta a mudança), e sem resolver nada é publicado. Teste que já falhava na
+                      branch não conta.
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
   CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
                       requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
@@ -262,8 +264,10 @@ def correct(base, pr, dry):
         (work / "achados.md").write_text(
             body(work, pr)[0] + "\n\n❌ **A sua mudança quebrou testes que passavam na branch.** A suíte completa rodou antes e "
             "depois da mudança; estes passavam e agora falham:\n" + "\n".join(f"- `{x}`" for x in broke)
-            + "\n\nConserte a mudança, não o teste. Se o teste está certo e a correção não cabe sem mexer nele, desfaça a "
-            "mudança daquele achado e responda DECISÃO.\n")
+            + "\n\nPara cada um: se o teste afirmava exatamente o comportamento que o ticket manda mudar, arrume o teste "
+            "(só essa asserção, para o comportamento do ticket) e diga isso na resposta. Se o teste cobre outra coisa, a "
+            "mudança tem efeito colateral: conserte a mudança. Se não dá para dizer pelo ticket, desfaça a mudança daquele "
+            "achado e responda DECISÃO.\n")
 
     publish(pr, branch, head, tree, work, verdict, dry, fresh)
     if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade

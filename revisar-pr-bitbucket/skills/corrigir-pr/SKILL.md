@@ -30,7 +30,7 @@ O `CLAUDE.md` do repo vale para você como para qualquer dev: comando de build, 
   - o ticket não diz o que deve acontecer, ou diz algo que contradiz outra regra do fluxo (o caso é parte de uma cadeia e a ação pedida desfaz ou bloqueia outra etapa);
   - há mais de um jeito razoável e eles mudam o que o usuário vê, o contrato da API ou o dado gravado;
   - a correção pede mexer no que já está gravado em produção (script de reparo, migration que reescreve dado) — você não roda nada em banco e não escreve reparo de dado por conta própria;
-  - um teste existente quebra com a correção: você não mexe na asserção; qual dos dois lados está certo é decisão;
+  - um teste existente quebra com a correção e não dá para dizer, pelo ticket, qual dos dois lados está certo (ver "Teste que quebra com a correção");
   - a causa raiz do bug do ticket não é a que o PR ataca e você não conseguiu confirmar a verdadeira no código.
 
 Na dúvida entre CORRIGIDO e DECISÃO, é DECISÃO. Corrigir errado custa mais que perguntar.
@@ -42,6 +42,16 @@ Na dúvida entre CORRIGIDO e DECISÃO, é DECISÃO. Corrigir errado custa mais q
 - Não desfaça o que o PR já resolve, nem o que uma volta anterior sua resolveu e o revisor aceitou.
 - Edite só dentro do diretório atual. Nada de `git commit`, `checkout`, `stash`, `reset`, `push`.
 - Sem arquivo novo que não seja necessário para a correção (nada de doc, nada de script solto).
+
+## Teste que quebra com a correção
+
+Um teste que passava e passa a falhar com a sua mudança tem três leituras. Descubra qual é antes de mexer:
+
+- **O teste afirmava exatamente o comportamento que o ticket manda mudar.** O bug estava fixado no teste (em muitos repos, de propósito, até a correção chegar). Arrume o teste: troque a asserção daquele comportamento pelo que o ticket define como certo. Só essa asserção — não apague o teste, não afrouxe (`assertTrue(true)`, remover verificação, marcar como ignorado), não mexa nas outras. Se o repo tem regra para teste que fixa bug (marca, registro), siga a regra.
+- **O teste cobre outra coisa.** A sua mudança tem efeito colateral. Conserte a mudança, não o teste.
+- **Não dá para dizer, pelo ticket, qual lado está certo.** DECISÃO.
+
+Na `resposta.md`, todo teste alterado é dito: qual teste, o que ele afirmava, o que passou a afirmar e o trecho do ticket que decide.
 
 ## Verificar antes de responder
 
