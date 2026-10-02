@@ -11,6 +11,7 @@ na fila. Sem argumento ele esvazia a fila, um PR por vez, e sai. Um lock própri
                                   comentários do PR e roda
   corrigir.py ... --ensaio        faz as voltas e mostra o que publicaria; não dá push nem escreve
                                   no Bitbucket, e deixa a cópia da branch para conferir
+                                  (o PR sai da fila ao fim do ensaio)
 
 O que faz, por PR na fila ($REVISOR_DIR/trabalho/correcao/<pr>/ com achados.md e marca.json,
 deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
@@ -216,7 +217,9 @@ def correct(base, pr, dry):
             break
 
     publish(pr, branch, head, tree, work, verdict, dry)
-    if not dry:
+    if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade
+        (work / "marca.json").rename(work / "marca-ensaio.json")
+    else:
         git("worktree", "remove", "--force", str(tree))
         archive(work, pr)
 
