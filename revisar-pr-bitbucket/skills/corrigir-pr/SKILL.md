@@ -24,7 +24,7 @@ O `CLAUDE.md` do repo vale para você como para qualquer dev: comando de build, 
 
 **2. Decida a saída:**
 
-- **CORRIGIDO** — o comportamento certo já está decidido e você implementou. Está decidido quando o ticket diz (descrição, ampliação do QA, resposta do dev ou de produto), quando o achado é mecânico (falta `order by`, falta limite, falta filtro de tenant, falta o mesmo gate que a porta ao lado já tem, catch que engole exceção), ou quando o próprio PR já faz o certo em um caminho e esqueceu outro.
+- **CORRIGIDO** — o comportamento certo já está decidido e você implementou. Está decidido quando o ticket diz (descrição, ampliação do QA, resposta do dev ou de produto), quando o próprio achado traz a decisão já tomada (o revisor cita o comentário do PR em que o dev ou produto decidiu), quando o achado é mecânico (falta `order by`, falta limite, falta filtro de tenant, falta o mesmo gate que a porta ao lado já tem, catch que engole exceção), ou quando o próprio PR já faz o certo em um caminho e esqueceu outro.
 - **DISCORDO** — você conferiu e o achado não procede. Só com evidência: `arquivo:linha`, o trecho que mostra, o cenário que o revisor descreveu e por que ele não acontece. "Não parece ser problema" não é resposta.
 - **DECISÃO** — corrigir exigiria escolher algo que ninguém escolheu. Diga qual é a escolha, quais são as saídas possíveis e de quem ela é (dev ou produto). É decisão quando:
   - o ticket não diz o que deve acontecer, ou diz algo que contradiz outra regra do fluxo (o caso é parte de uma cadeia e a ação pedida desfaz ou bloqueia outra etapa);
