@@ -31,8 +31,12 @@ Ambiente (além das credenciais que a skill pede):
                       (obrigatório com --urgente)
   REVISOR_AVISAR      comando que recebe o aviso como último argumento (ex.: um script que manda
                       para o chat). Sem ele, o aviso fica só em $REVISOR_DIR/avisos.log.
+  CORRETOR_CLAUDE     se definido, a rodada é de triagem: PR aprovado é aprovado, e PR com achado
+                      não recebe comentário — os achados vão para a fila do corretor
+                      ($REVISOR_DIR/trabalho/correcao/<pr>/), que `corrigir.py` consome. PR na fila
+                      fica fora das rodadas até a correção terminar ou o PR mudar.
 """
-import datetime, json, os, pathlib, shlex, subprocess, sys
+import datetime, json, os, pathlib, shlex, shutil, subprocess, sys
 
 import bitbucket
 
@@ -47,10 +51,17 @@ CLAUDE = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
 STATE = DIR / "estado.json"
 URGENT = "--urgente" in sys.argv[1:]
 REVIEWER = os.environ.get("REVISOR_REVISOR")
+TRIAGE = bool(os.environ.get("CORRETOR_CLAUDE"))
+WORK = DIR / "trabalho" / "correcao"
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
           "resultado no Bitbucket. Escreva o relatório final em português.")
+PROMPT_TRIAGE = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
+                 "Modo triagem. Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs}. "
+                 "Aprove os que passarem; para os que tiverem achado, não escreva no Bitbucket: grave "
+                 "{work}/<número do PR>/achados.md. Baixe os tickets em {work}/issues. "
+                 "Escreva o relatório final em português.")
 
 
 def now():
@@ -80,6 +91,21 @@ def changed_since(base, pr, since):
         return False
     last = next(v for k, v in d["values"][0].items() if isinstance(v, dict) and ("date" in v or "created_on" in v))
     return datetime.datetime.fromisoformat(last.get("date") or last["created_on"]) > datetime.datetime.fromisoformat(since)
+
+
+def in_correction(base, pr, commit):
+    """O PR está na fila do corretor, no mesmo commit e sem atividade nova desde a triagem?
+    Marca velha (o PR mudou) é arquivada: a triagem recomeça."""
+    mark = WORK / pr / "marca.json"
+    if not mark.exists():
+        return False
+    m = json.loads(mark.read_text())
+    if m["commit"] == commit and not changed_since(base, pr, m["desde"]):
+        return True
+    dest = WORK / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-mudou"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(WORK / pr), str(dest))
+    return False
 
 
 def to_review():
@@ -125,19 +151,24 @@ def main():
              if (URGENT and pr not in before)
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
-    todo = [pr for pr in before if pr not in blocked][:MAX]
+    waiting = [pr for pr in before if TRIAGE and pr not in blocked and in_correction(base, pr, before[pr])]
+    todo = [pr for pr in before if pr not in blocked and pr not in waiting][:MAX]
     if not todo:
         STATE.write_text(json.dumps(state, indent=1))
         if not URGENT:
-            log(f"nada a revisar ({len(blocked)} fora das rodadas por falta de veredito)")
+            log(f"nada a revisar ({len(blocked)} fora das rodadas por falta de veredito"
+                + (f", {len(waiting)} na fila do corretor)" if TRIAGE else ")"))
         return
 
     log(f"rodada{' urgente' if URGENT else ''}: {', '.join('#' + pr for pr in todo)}"
-        + (f" ({len(before) - len(blocked) - len(todo)} ficam para a próxima)" if len(before) - len(blocked) > len(todo) else ""))
+        + (f" ({len(before) - len(blocked) - len(waiting) - len(todo)} ficam para a próxima)"
+           if len(before) - len(blocked) - len(waiting) > len(todo) else ""))
     out = DIR / "rodadas" / f"{datetime.datetime.now():%Y%m%d-%H%M}.log"
+    started = datetime.datetime.now().timestamp()
+    prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK)
     with open(out, "w") as fh:
         try:
-            r = subprocess.run([*CLAUDE, "-p", PROMPT.format(prs=", ".join("#" + pr for pr in todo))],
+            r = subprocess.run([*CLAUDE, "-p", prompt],
                                cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT)
             end = f"claude saiu com {r.returncode}"
         except subprocess.TimeoutExpired:
@@ -149,10 +180,16 @@ def main():
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
     after = to_review()
     since = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    done = 0
+    done = sent = 0
     for pr in todo:
         if after.get(pr) != before[pr]:  # saiu do REVISAR, ou recebeu commit durante a rodada
             done += pr not in after
+            state.pop(pr, None)
+            continue
+        found = WORK / pr / "achados.md"
+        if TRIAGE and found.exists() and found.stat().st_mtime >= started:  # triagem achou problema: vai ao corretor
+            (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
+            sent += 1
             state.pop(pr, None)
             continue
         n = state.get(pr, {}).get("tentativas", 0) + 1
@@ -162,7 +199,8 @@ def main():
                  f"ou mudança de estado. "
                  f"Última rodada: {out}")
     STATE.write_text(json.dumps(state, indent=1))
-    log(f"fim ({end}): {done} de {len(todo)} saíram do REVISAR; saída em {out}")
+    log(f"fim ({end}): {done} de {len(todo)} saíram do REVISAR" + (f", {sent} para o corretor" if TRIAGE else "")
+        + f"; saída em {out}")
 
 
 if __name__ == "__main__":

@@ -155,3 +155,47 @@ python3 $S/bitbucket.py approve <prs ✅>
 Releia o arquivo antes de postar (o dev pode ter editado). Confira a saída de cada chamada; ERRO em algum PR é dito com o número do PR que ficou sem ação.
 
 Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada / pulado: fechado ou revisão ativa).
+
+## Com corretor (modo triagem e modo portão)
+
+Só quando o pedido disser **modo triagem** ou **modo portão**. Há um agente corretor (skill `corrigir-pr`) entre a revisão e o dev: o dev só recebe pedido de mudança depois que o corretor tentou corrigir ou contestou o achado. Quem conduz as voltas, publica a mudança e escreve no Bitbucket é quem chamou; você só revisa.
+
+### Modo triagem
+Revise como sempre (Passos 1 a 4). Muda o Passo 5:
+- **✅** → aprova como sempre (com nota de produto: comenta e aprova).
+- **❌ ou ⚠️** → **não toque no Bitbucket**: nem comentário, nem request changes. Escreva os achados do PR em `<pasta indicada>/<número do PR>/achados.md`, um arquivo por PR, no formato do Passo 4 (cabeçalho `## <ticket ou título curto> (#<pr>)`).
+- **INCONCLUSIVO** → nada, como sempre.
+
+O `achados.md` é tudo o que o corretor vai ler, então:
+- traz **todos** os achados de pé, mesmo numa re-revisão (o corretor não lê os comentários do PR);
+- cada achado diz o comportamento esperado e de onde ele vem (trecho do ticket, regra, a porta ao lado que já faz certo) — é o que deixa o corretor corrigir sem decidir nada;
+- se o dev contestou um achado e você o manteve, inclua o argumento dele e por que não fecha.
+
+Na entrega final, a ação desses PRs é "enviado ao corretor".
+
+### Modo portão
+O diretório atual é uma cópia da branch do PR com a mudança do corretor **ainda sem commit** (`git status`, `git diff`; o diff do PR inteiro continua sendo contra o merge-base com o destino). Na pasta indicada estão o `achados.md` e a `resposta.md` do corretor. Não edite código e não toque no Bitbucket.
+
+Confira achado por achado, pela resposta dele:
+- **CORRIGIDO:** leia a mudança no código, não só a descrição. Resolve o achado em todos os caminhos? A mudança quebra algo ou abre brecha (método do Passo 2)?
+- **DISCORDO:** confira a evidência no código. Procede: o achado cai. Não procede: responda em cima do argumento, com `arquivo:linha`.
+- **DECISÃO:** é mesmo uma escolha que ninguém fez? Se o ticket ou o código já respondem, diga onde; o achado volta para ele corrigir.
+
+A mudança do corretor passa pela mesma régua de "O que é achado": não reprove por estilo, preferência ou preciosismo. Se ele diz que não conseguiu compilar ou testar, isso por si só não reprova; pese o risco da mudança.
+
+Entregue na mesma pasta:
+
+**`veredito.json`**
+```json
+{"estado": "aprovado | parcial | reprovado", "corrigido": ["uma linha por correção que você aceitou"], "motivo": "uma frase"}
+```
+- **aprovado:** nenhum achado de pé, e o PR com a mudança local (se houver) passa nas três perguntas.
+- **parcial:** a mudança local está boa e pode subir, e o que sobra depende de decisão de dev ou produto — o corretor não tem mais o que fazer.
+- **reprovado:** há achado de pé ou problema na mudança, e o corretor ainda pode agir.
+
+**`achados.md`**, regravado:
+- aprovado: vazio (só o cabeçalho);
+- parcial: só o que sobra, escrito para o dev — o que já foi corrigido não entra; para cada pendência, o que foi tentado, por que parou, que decisão falta e de quem;
+- reprovado: os achados de pé e o que está errado na tentativa, para a próxima volta do corretor.
+
+Na **última volta** (o pedido diz) não há próxima: se não for aprovado nem parcial, o `achados.md` é o texto final para o dev — o que se sabe, já discutido com o corretor, sem contar a história das voltas.
