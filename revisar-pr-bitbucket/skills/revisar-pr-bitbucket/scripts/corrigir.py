@@ -41,7 +41,7 @@ Ambiente (além do que cron.py já usa):
                       a nenhuma sessão do Claude. Sem ele, o push usa o remoto do clone e tudo o que é
                       escrito no PR sai com a credencial do revisor.
 """
-import argparse, datetime, fcntl, json, os, pathlib, re, shlex, shutil, subprocess, sys
+import argparse, datetime, fcntl, json, os, pathlib, re, shlex, shutil, subprocess, sys, time
 
 import bitbucket
 
@@ -286,6 +286,14 @@ def publish(pr, branch, head, tree, work, verdict, dry):
         if rc != 0:
             log(f"#{pr}: push falhou, nada publicado: {out[:200]}")
             return
+        # o Bitbucket registra o push no PR com atraso; a marca do revisor tem que vir depois dele,
+        # senão o PR volta como "commit novo depois de <revisão>" e é revisado de novo à toa
+        for _ in range(30):
+            st, d = bitbucket.call("GET", f"{bitbucket.resolve_repo(None)}/pullrequests/{pr}", params={"fields": "source.commit.hash"})
+            if st == 200 and d["source"]["commit"]["hash"][:12] == commit:
+                break
+            time.sleep(2)
+        time.sleep(3)
     done = [f"push do commit {commit}"] if commit else []
     for who, _, path in posts:  # o do corretor primeiro: a marca do revisor fecha a conversa
         ok, out = write("comment", str(path), fixer=who)
