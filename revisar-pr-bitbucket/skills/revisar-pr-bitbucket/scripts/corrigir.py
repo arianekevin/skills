@@ -36,11 +36,13 @@ Ambiente (além do que cron.py já usa):
                       que compila e roda os testes); entra no pedido
   CORRETOR_SUITE      comando que roda a suíte completa de testes na cópia e imprime, um por linha,
                       os testes que falharam; saída diferente de 0 = a suíte não rodou (não compilou).
-                      Com ele, a suíte roda antes da correção e de novo depois que o revisor aceita a
-                      mudança: teste que passava e passou a falhar volta para o corretor como achado
+                      Com ele, depois que o revisor aceita a mudança, a suíte roda onde o PR vai parar:
+                      o destino atual com a branch e a mudança por cima, comparado com o destino sozinho
+                      (se a branch conflita com o destino, a comparação é na própria branch).
+                      Teste que passa sem o PR e falha com ele volta para o corretor como achado
                       (ele arruma o teste, se o teste fixava o comportamento que o ticket muda, ou
-                      conserta a mudança), e sem resolver nada é publicado. Teste que já falhava na
-                      branch não conta.
+                      conserta a mudança), e sem resolver nada é publicado. Teste que já falhava no
+                      destino não conta.
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
   CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
                       requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
@@ -114,17 +116,55 @@ def suite(tree, out):
     return {line.strip() for line in r.stdout.splitlines() if line.strip()} if r.returncode == 0 else None
 
 
-def broken(tree, base, hist):
-    """Testes que passavam na branch e falham com a mudança. Vazio: nada quebrou.
+def scratch(name, ref):
+    """Cópia descartável do repo em `ref`, ou None."""
+    path = TREES / name
+    git("worktree", "remove", "--force", str(path))
+    return path if git("worktree", "add", "--detach", str(path), ref)[0] == 0 else None
+
+
+def baseline(ref, logs):
+    """Testes que já falham em `ref`. Guardado por commit: enquanto o destino não anda, não roda de novo."""
+    cache = TREES / f"suite-{git('rev-parse', '--short=12', ref)[1]}.txt"
+    if cache.exists():
+        return set(cache.read_text().split())
+    path = scratch(cache.stem, ref)
+    found = suite(path, logs / f"{cache.stem}.log") if path else None
+    git("worktree", "remove", "--force", str(TREES / cache.stem))
+    if found is not None:
+        cache.write_text("\n".join(sorted(found)))
+    return found
+
+
+def broken(pr, tree, branch, dest, hist):
+    """Testes que o PR, com a mudança do corretor, quebra: (lista, onde foi medido). Lista vazia: nada quebrou.
+    Mede onde o PR vai parar: o destino atual, com a branch e a mudança por cima, contra o destino sozinho.
+    Se a branch conflita com o destino, mede na própria branch. None: não deu para comparar.
     Só conta o que falha em duas rodadas seguidas (teste instável não segura a correção)."""
-    after = suite(tree, hist / "suite-depois.log")
-    if after is None:
-        return ["a suíte não rodou com a mudança (não compila?) — veja a verificação"]
-    new = after - base
-    if new:
-        again = suite(tree, hist / "suite-depois-2.log")
-        new &= again if again is not None else new
-    return sorted(new)
+    git("add", "-A", cwd=tree)
+    patch = hist / "mudanca.patch"
+    patch.write_text(git("diff", "--cached", "--binary", "HEAD", cwd=tree)[1] + "\n")
+    git("reset", "-q", cwd=tree)  # a mudança continua sem commit e fora do índice, como o revisor espera ver
+    stage, where, ref = scratch(f"pr-{pr}-{dest}", f"origin/{dest}"), f"em cima da {dest} atual", f"origin/{dest}"
+    if not (stage and git("merge", "--no-commit", "--no-ff", f"origin/{branch}", cwd=stage)[0] == 0
+            and git("apply", "--index", str(patch), cwd=stage)[0] == 0):
+        git("worktree", "remove", "--force", str(TREES / f"pr-{pr}-{dest}"))
+        stage, where, ref = tree, f"na própria branch, porque ela conflita com a {dest}", f"origin/{branch}"
+    try:
+        base = baseline(ref, hist)
+        if base is None:
+            return None, where
+        after = suite(stage, hist / "suite-depois.log")
+        if after is None:
+            return ["a suíte não rodou com a mudança (não compila?)"], where
+        new = after - base
+        if new:
+            again = suite(stage, hist / "suite-depois-2.log")
+            new &= again if again is not None else new
+        return sorted(new), where
+    finally:
+        if stage != tree:
+            git("worktree", "remove", "--force", str(stage))
 
 
 def queue():
@@ -211,9 +251,6 @@ def correct(base, pr, dry):
         log(f"#{pr}: não consegui criar a cópia da branch: {out[:200]}")
         return
     log(f"#{pr}: correção{' (ensaio)' if dry else ''}, {branch} em {head}")
-    base = suite(tree, work / "suite-antes.log") if SUITE else None
-    if SUITE:
-        log(f"#{pr}: suíte antes da correção: " + ("não rodou; a comparação fica sem efeito" if base is None else f"{len(base)} teste(s) já falhando"))
 
     safe = {k: v for k, v in os.environ.items() if not SECRET.search(k) or k == "CLAUDE_CODE_OAUTH_TOKEN"}
     fmt = dict(pr=pr, branch=branch, dest=dest, n=VOLTAS, work=work, issues=issues,
@@ -251,10 +288,14 @@ def correct(base, pr, dry):
         log(f"#{pr}: volta {v}, {verdict['estado']}: {str(verdict.get('motivo', ''))[:160]}")
         if verdict["estado"] not in ("aprovado", "parcial"):
             continue
-        broke = broken(tree, base, hist) if base is not None and git("status", "--porcelain", cwd=tree)[1] else []
+        broke, where = broken(pr, tree, branch, dest, hist) if SUITE and git("status", "--porcelain", cwd=tree)[1] else ([], "")
+        if broke is None:
+            log(f"#{pr}: volta {v}, suíte sem comparação ({where}): a base não rodou")
+        elif where:
+            log(f"#{pr}: volta {v}, suíte completa {where}: {len(broke)} teste(s) quebrado(s)")
         if not broke:
             break
-        log(f"#{pr}: volta {v}, a mudança quebrou {len(broke)} teste(s) que passavam: {', '.join(broke)[:200]}")
+        log(f"#{pr}: volta {v}, quebrou: {', '.join(broke)[:200]}")
         (hist / "suite-quebrou.txt").write_text("\n".join(broke) + "\n")
         verdict = None
         if v == VOLTAS:  # sem volta para consertar: a mudança é descartada e vale o que o revisor achou no início
@@ -262,8 +303,8 @@ def correct(base, pr, dry):
             fresh = not json.loads((work / "marca.json").read_text()).get("reaberto")
             break
         (work / "achados.md").write_text(
-            body(work, pr)[0] + "\n\n❌ **A sua mudança quebrou testes que passavam na branch.** A suíte completa rodou antes e "
-            "depois da mudança; estes passavam e agora falham:\n" + "\n".join(f"- `{x}`" for x in broke)
+            body(work, pr)[0] + f"\n\n❌ **O PR, com a sua mudança, quebra testes que hoje passam.** A suíte completa rodou "
+            f"{where}; estes passam sem o PR e falham com ele:\n" + "\n".join(f"- `{x}`" for x in broke)
             + "\n\nPara cada um: se o teste afirmava exatamente o comportamento que o ticket manda mudar, arrume o teste "
             "(só essa asserção, para o comportamento do ticket) e diga isso na resposta. Se o teste cobre outra coisa, a "
             "mudança tem efeito colateral: conserte a mudança. Se não dá para dizer pelo ticket, desfaça a mudança daquele "
