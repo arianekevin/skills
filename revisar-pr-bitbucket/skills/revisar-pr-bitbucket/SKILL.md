@@ -13,6 +13,16 @@ Objetivo: não deixar passar coisa absurda. Três perguntas por PR, nada além:
 
 Fora do escopo: nome, estilo, refatoração, "dava para fazer melhor". Só entra se causar um dos três acima.
 
+### O que é achado
+Achado é o que segura o merge: mergeado como está, o cliente do ticket continua com o erro, um fluxo em uso hoje quebra, dado se perde ou se corrompe, o banco trava, ou abre brecha. Com cenário que alguém vai encontrar em uso normal, não um caso de borda hipotético.
+
+O teste: se o dev responder "não vou mexer nisso", você seguraria o merge? Se não, não é achado — não vira ❌ nem ⚠️, não vira comentário, não entra no relatório. Não é achado:
+- caso de borda improvável, robustez que "seria bom ter", exatidão de comportamento auxiliar (desfazer, log, histórico) que continua funcionando;
+- pedido de processo: anexar script ou SQL, registrar data, documentar, provar que rodou, escrever teste;
+- preferência de como resolver, quando o jeito do dev resolve.
+
+Na dúvida entre achado e preciosismo, é preciosismo.
+
 ### Padrões comuns
 
 Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Dois têm peso aqui:
@@ -71,7 +81,7 @@ Poucos PRs pequenos (até ~4): revise direto. Mais que isso, ou um PR grande: su
 ### Como revisar (vale para você e para os agentes)
 - Leia o ticket inteiro (descrição, comentários de QA — "ampliação" — e o "como testar" do dev), a descrição e os comentários do PR.
 - O fix bate com o erro real? Confira a causa declarada contra a stack, a mensagem e o schema (constraint, tipo de id, unique). Trocar `error` por `warn`, ou um catch que engole a exceção, esconde o sintoma, não corrige.
-- O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script ou migration), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
+- O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script, migration, ou o dev dizer no PR ou no ticket que o reparo foi feito direto no banco), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
 - Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)?
 - Catch que só loga + nova validação = dado perdido em silêncio (lead, importação, webhook).
@@ -85,6 +95,8 @@ Achados mais graves (❌ e brecha de segurança): confira você no código antes
 O PR já foi revisado e depois recebeu commit, comentário de quem não é o revisor, ou os dois. Parta da revisão anterior (`comments`), não do zero:
 - **Commit novo:** confira no código atual se cada achado anterior foi resolvido e revise o que os commits trouxeram com o mesmo método. Rebase ou merge do destino na branch muda o commit sem mudar o PR: compare o diff do PR antes de tratar como correção.
 - **Comentário novo:** é o dev respondendo, muitas vezes contestando um achado. Leia o argumento e confira no código. Se ele tem razão, o achado cai. Se ele afirma algo que o código não mostra (produto respondeu, o dado foi corrigido direto no banco, a infra ajustou), vale a palavra dele: o achado cai, sem pedir prova. Se o achado se mantém, responda em cima do argumento dele — o que ele disse, por que não fecha, com `arquivo:linha` —, sem colar o achado de novo.
+
+A re-revisão não sobe a régua: achado novo só no que o commit novo trouxe, e só se passar no teste de "O que é achado". Resposta do dev não abre pedido novo — nada de cobrar detalhe, evidência ou complemento do que ele respondeu.
 
 O comentário da re-revisão traz só o que mudou; o que já está escrito no PR não é repetido:
 - achado resolvido ou derrubado: não aparece;
@@ -109,8 +121,8 @@ Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial)
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria
-- ⚠️ resolve com ressalva: parcial, porta paralela aberta, quebra menor, decisão de produto sobre comportamento que o PR introduz
-- ✅ ok (ressalva mínima não conta; dúvida de produto sobre comportamento que o PR só preserva também não)
+- ⚠️ resolve, mas com ressalva que segura o merge: parcial (o erro do ticket continua por outro caminho), porta paralela aberta, quebra que alguém vai encontrar em uso normal, decisão de produto sobre comportamento que o PR introduz
+- ✅ ok. O que não segura o merge não conta e não é comentado; dúvida de produto sobre comportamento que o PR só preserva também não conta
 - **INCONCLUSIVO**: a revisão não fechou — diff inacessível, agente que falhou, trecho crítico não lido. Diga até onde chegou, o que falta e como obter. PR inconclusivo não é aprovado nem recebe request changes.
 
 ## Passo 4 — Comentários
@@ -121,7 +133,7 @@ Cada achado:
 ```
 ❌|⚠️ **<problema em uma frase>.** <evidência: arquivo:linha e cenário concreto>. <sugestão de correção que não quebra a própria correção nem outro fluxo>.
 ```
-Curto. Sem elogio, sem resumo do PR, sem estilo. Contradição no "como testar" → ℹ️ uma linha.
+Curto. Sem elogio, sem resumo do PR, sem estilo, sem observação que não segura o merge. Contradição no "como testar" → ℹ️ uma linha.
 
 Decisão de produto depende de quem trouxe o comportamento em dúvida (`git log` do arquivo):
 - **O PR introduz:** ⚠️ "Para produto confirmar: …", e o PR recebe request changes.
