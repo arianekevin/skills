@@ -5,6 +5,9 @@ Uso (crontab, em horário comercial; `flock` impede duas rodadas ao mesmo tempo)
   */30 8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py >> ~/revisor/cron.log 2>&1
   */2  8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py --urgente >> ~/revisor/cron.log 2>&1
 
+`--so PR` restringe a rodada a um PR: é como o validador aciona o revisor, sem esperar o cron,
+quando a prova de um PR aprovado não fecha (ver 3b).
+
 `--urgente` é a via rápida: olha só os PRs que têm a conta do agente ($REVISOR_REVISOR) entre os
 revisores. O dev pede urgência adicionando essa conta como revisor do PR. Sem PR a revisar, sai
 sem fetch, sem chamar o Claude e sem escrever no log.
@@ -16,10 +19,11 @@ O que faz:
   2. Chama `claude -p` com a skill sobre os PRs a revisar (no máximo $REVISOR_MAX por rodada).
   3. Lista de novo. PR que entrou na rodada e continua REVISAR no mesmo commit ficou sem veredito
      (inconclusivo, erro ao aplicar, rodada cortada): conta uma tentativa.
-  3b. PR que o validador devolveu ($REVISOR_DIR/trabalho/validacao/<pr>/ com evidencia.md e
-     marca.json — a prova, feita depois da aprovação, não fechou) volta para a rodada: a aprovação
-     do próprio revisor é retirada e a evidência entra no pedido. Se a revisão mantém o PR, o
-     nota.md da pasta é postado (o merge fica manual). O validador não escreve no PR nesses casos.
+  3b. Com --so: se o validador deixou evidência para o PR ($REVISOR_DIR/trabalho/validacao/<pr>/ com
+     evidencia.md e marca.json — a prova, feita depois da aprovação, não fechou), a aprovação do
+     próprio revisor é retirada e a evidência entra no pedido. Essa rodada é calada: o revisor (e o
+     corretor, se for acionado) só marca aprovação ou request changes e dá push; quem comenta no PR
+     é o validador, que acionou a rodada e está esperando o veredito.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
      no PR depois da última tentativa zera a contagem: commit, comentário, mudança de estado
      (saiu do draft, marca removida, título ou descrição editados).
@@ -57,6 +61,7 @@ TIMEOUT = int(os.environ.get("REVISOR_TIMEOUT", "50")) * 60
 CLAUDE = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
 STATE = DIR / "estado.json"
 URGENT = "--urgente" in sys.argv[1:]
+ONLY = sys.argv[sys.argv.index("--so") + 1] if "--so" in sys.argv[1:-1] else None
 REVIEWER = os.environ.get("REVISOR_REVISOR")
 TRIAGE = bool(os.environ.get("CORRETOR_CLAUDE"))
 WORK = DIR / "trabalho" / "correcao"
@@ -138,10 +143,10 @@ def unflag(pr, why):
 
 
 def flagged(base, before):
-    """PRs que o validador devolveu, no commit em que estão: entram em `before`, sem a aprovação do
-    próprio revisor (a de outra pessoa não dá para retirar; o PR entra na rodada assim mesmo)."""
+    """O PR da rodada (--so), se o validador deixou evidência para o commit em que ele está: entra em
+    `before`, sem a aprovação do próprio revisor (a de outra pessoa não dá para retirar; entra assim mesmo)."""
     found = []
-    for d in sorted(FLAGS.iterdir()) if FLAGS.is_dir() else []:
+    for d in [FLAGS / ONLY] if (FLAGS / ONLY).is_dir() else []:
         if not (d.name.isdigit() and (d / "marca.json").exists() and (d / "evidencia.md").exists()):
             continue
         st, info = bitbucket.call("GET", f"{base}/{d.name}", params={"fields": "state,source.commit.hash"})
@@ -157,18 +162,6 @@ def flagged(base, before):
     return found
 
 
-def settle(base, pr):
-    """Fim da rodada para um PR devolvido pelo validador que saiu do REVISAR: com request changes, a
-    revisão já falou; mantido, o revisor posta a nota do validador (merge manual)."""
-    st, d = bitbucket.call("GET", f"{base}/{pr}", params={"fields": "participants.state"})
-    if st == 200 and not any(p.get("state") == "changes_requested" for p in d.get("participants", [])) and (FLAGS / pr / "nota.md").exists():
-        r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), "comment", str(FLAGS / pr / "nota.md"), "--isolado"],
-                           cwd=CLONE, capture_output=True, text=True)
-        log(f"#{pr}: revisão mantida depois da evidência do validador; nota de merge manual "
-            + ("postada" if r.returncode == 0 and r.stdout.strip().endswith("ok") else f"FALHOU ({(r.stdout + r.stderr).strip()[:160]})"))
-    unflag(pr, "revisado")
-
-
 def conflicts(commit):
     """Arquivos em que o PR conflita com o destino atual (lista vazia: entra limpo)."""
     r = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", "--no-messages", f"origin/{DEST}", commit],
@@ -176,8 +169,9 @@ def conflicts(commit):
     return r.stdout.splitlines()[1:] if r.returncode == 1 else []
 
 
-def hold(pr, files):
-    """PR em conflito com o destino: comentário + request changes, sem chamar o Claude. Devolve se segurou."""
+def hold(pr, files, quiet=False):
+    """PR em conflito com o destino: comentário + request changes, sem chamar o Claude. Devolve se segurou.
+    `quiet`: só o request changes (rodada acionada pelo validador, que é quem comenta)."""
     if not files:
         return False
     text = DIR / "rodadas" / f"conflito-{pr}.md"
@@ -185,7 +179,7 @@ def hold(pr, files):
                     + "\n".join(f"- `{f}`" for f in files)
                     + f"\n\nAtualize a branch em cima da `{DEST}` e resolva o conflito. A revisão vale para o código que vai "
                     "entrar, e com conflito ele ainda não existe. Com o commit novo, o PR volta para a revisão.\n")
-    for cmd, arg in (("comment", str(text)), ("request-changes", pr)):
+    for cmd, arg in (("comment", str(text)), ("request-changes", pr))[quiet:]:
         r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, arg], cwd=CLONE, capture_output=True, text=True)
         if r.returncode != 0 or not r.stdout.strip().endswith("ok"):
             log(f"#{pr}: conflita com a {DEST}, mas {cmd} falhou ({(r.stdout + r.stderr).strip()[:160]}); segue para a revisão")
@@ -231,16 +225,18 @@ def main():
 
     before = to_review()
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
-    flags = [] if URGENT else flagged(base, before)
+    flags = flagged(base, before) if ONLY else []
+    if ONLY:
+        before = {pr: commit for pr, commit in before.items() if pr == ONLY}
     # a contagem vale enquanto o PR está como na última tentativa: commit ou atividade nova zera;
     # PR que saiu da lista some do estado (na via rápida a lista é parcial: o que não está nela fica)
     state = {pr: s for pr, s in state.items()
-             if (URGENT and pr not in before)
+             if ((URGENT or ONLY) and pr not in before)
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
     waiting = [pr for pr in before if TRIAGE and pr not in blocked and in_correction(base, pr, before[pr])]
     for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
-        if not URGENT and hold(pr, conflicts(before[pr])):
+        if not URGENT and hold(pr, conflicts(before[pr]), quiet=pr in flags):
             del before[pr]
             if pr in flags:
                 unflag(pr, "conflito")
@@ -284,11 +280,11 @@ def main():
             done += pr not in after
             state.pop(pr, None)
             if pr in back and pr not in after:
-                settle(base, pr)
+                unflag(pr, "revisado")
             continue
         found = WORK / pr / "achados.md"
         if TRIAGE and found.exists() and found.stat().st_mtime >= started:  # triagem achou problema: vai ao corretor
-            (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
+            (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since, "validador": pr in back}))
             sent += 1
             state.pop(pr, None)
             if pr in back:

@@ -39,6 +39,8 @@ API = "https://api.bitbucket.org/2.0/repositories"
 # marca já calculada de cada PR, para não reler a activity de PR que não mudou
 CACHE = pathlib.Path(os.environ.get("XDG_CACHE_HOME", "~/.cache")).expanduser() / "revisar-pr-bitbucket" / "marcas.json"
 _cache = None
+# quem comenta sem que isso conte como novidade para a revisão (ex.: o validador, que dá o retorno depois dela)
+SILENT = {n.strip() for n in os.environ.get("REVISOR_IGNORAR", "").split(",") if n.strip()}
 
 
 def resolve_repo(arg):
@@ -103,6 +105,8 @@ def news_after_review(base, pr_id, reviewers):
             d = when((v.get("approval") or v["changes_requested"])["date"])
             reviewed = max(reviewed or d, d)
         elif "comment" in v:
+            if (v["comment"].get("user") or {}).get("display_name") in SILENT:
+                continue
             d = when(v["comment"]["created_on"])
             if (v["comment"].get("user") or {}).get("uuid") in reviewers:
                 reviewed = max(reviewed or d, d)

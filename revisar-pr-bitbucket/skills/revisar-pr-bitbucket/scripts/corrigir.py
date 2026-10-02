@@ -313,7 +313,7 @@ def correct(base, pr, dry):
             "mudança tem efeito colateral: conserte a mudança. Se não dá para dizer pelo ticket, desfaça a mudança daquele "
             "achado e responda DECISÃO.\n")
 
-    publish(pr, branch, head, tree, work, verdict, dry, fresh)
+    publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=bool(mark.get("validador")))
     if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade
         (work / "marca.json").rename(work / "marca-ensaio.json")
     else:
@@ -321,7 +321,9 @@ def correct(base, pr, dry):
         archive(work, pr)
 
 
-def publish(pr, branch, head, tree, work, verdict, dry, fresh):
+def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
+    """`quiet`: o PR veio do validador, que espera o veredito e é quem comenta. Os textos ficam na pasta;
+    no PR entram só o push e a marca (aprovação ou request changes)."""
     state = verdict["estado"] if verdict and verdict["estado"] in ("aprovado", "parcial") else "sem acordo"
     changed = bool(git("status", "--porcelain", cwd=tree)[1]) and state != "sem acordo"
     title, rest = body(work, pr)
@@ -394,7 +396,7 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh):
             time.sleep(2)
         time.sleep(3)
     done = [f"push do commit {commit}"] if commit else []
-    for who, _, path in posts:  # o do corretor primeiro: a marca do revisor fecha a conversa
+    for who, _, path in [] if quiet else posts:  # o do corretor primeiro: a marca do revisor fecha a conversa
         ok, out = write("comment", str(path), fixer=who)
         done.append(f"comentário do {'corretor' if who else 'revisor'}" if ok else f"comentário FALHOU ({out[:120]})")
     ok, out = write(final, pr)
