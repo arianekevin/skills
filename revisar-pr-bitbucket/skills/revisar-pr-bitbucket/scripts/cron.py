@@ -8,6 +8,10 @@ Uso (crontab, em horário comercial; `flock` impede duas rodadas ao mesmo tempo)
 `--so PR` restringe a rodada a um PR: é como o validador aciona o revisor, sem esperar o cron,
 quando a prova de um PR aprovado não fecha (ver 3b).
 
+`--rever PR[,PR...]` refaz a revisão desses PRs mesmo que já tenham aprovação (à mão, quando a régua
+mudou). A aprovação de outro usuário não dá para retirar: se a revisão achar problema, o request
+changes que sai no fim pesa mais que ela.
+
 `--urgente` é a via rápida: olha só os PRs que têm a conta do agente ($REVISOR_REVISOR) entre os
 revisores. O dev pede urgência adicionando essa conta como revisor do PR. Sem PR a revisar, sai
 sem fetch, sem chamar o Claude e sem escrever no log.
@@ -62,6 +66,7 @@ CLAUDE = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
 STATE = DIR / "estado.json"
 URGENT = "--urgente" in sys.argv[1:]
 ONLY = sys.argv[sys.argv.index("--so") + 1] if "--so" in sys.argv[1:-1] else None
+REDO = sys.argv[sys.argv.index("--rever") + 1].split(",") if "--rever" in sys.argv[1:-1] else []
 REVIEWER = os.environ.get("REVISOR_REVISOR")
 TRIAGE = bool(os.environ.get("CORRETOR_CLAUDE"))
 WORK = DIR / "trabalho" / "correcao"
@@ -228,10 +233,17 @@ def main():
     flags = flagged(base, before) if ONLY else []
     if ONLY:
         before = {pr: commit for pr, commit in before.items() if pr == ONLY}
+    for pr in REDO:
+        st, info = bitbucket.call("GET", f"{base}/{pr}", params={"fields": "state,source.commit.hash"})
+        if pr not in before and st == 200 and info["state"] == "OPEN":
+            before[pr] = info["source"]["commit"]["hash"][:12]
+    if REDO:
+        before = {pr: commit for pr, commit in before.items() if pr in REDO}
+    forced = set(flags) | set(REDO)  # entram na rodada mesmo sem estar no REVISAR
     # a contagem vale enquanto o PR está como na última tentativa: commit ou atividade nova zera;
     # PR que saiu da lista some do estado (na via rápida a lista é parcial: o que não está nela fica)
     state = {pr: s for pr, s in state.items()
-             if ((URGENT or ONLY) and pr not in before)
+             if ((URGENT or ONLY or REDO) and pr not in before)
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
     waiting = [pr for pr in before if TRIAGE and pr not in blocked and in_correction(base, pr, before[pr])]
@@ -256,6 +268,9 @@ def main():
     started = datetime.datetime.now().timestamp()
     prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK)
     back = [pr for pr in todo if pr in flags]
+    if forced & set(todo):
+        prompt += (f" Os PRs {', '.join('#' + pr for pr in todo if pr in forced)} entram nesta rodada mesmo que a listagem os marque "
+                   "PULAR por aprovação: a aprovação está sendo refeita. Revise-os do zero, pela régua atual.")
     if back:
         prompt += (f" Atenção a {', '.join('#' + pr for pr in back)}: já tinha a sua aprovação, mas o validador rodou a prova "
                    f"depois dela e não fechou. A evidência está em {FLAGS}/<número do PR>/evidencia.md: leia antes de julgar, "
@@ -276,14 +291,16 @@ def main():
     since = datetime.datetime.now(datetime.timezone.utc).isoformat()
     done = sent = 0
     for pr in todo:
-        if after.get(pr) != before[pr]:  # saiu do REVISAR, ou recebeu commit durante a rodada
+        found = WORK / pr / "achados.md"
+        fresh = TRIAGE and found.exists() and found.stat().st_mtime >= started  # a triagem achou problema
+        # PR forçado pode nunca ter estado no REVISAR (a aprovação de outro usuário continua lá): o achado vale assim mesmo
+        if after.get(pr) != before[pr] and not (fresh and pr in forced and pr not in after):  # saiu do REVISAR, ou recebeu commit durante a rodada
             done += pr not in after
             state.pop(pr, None)
             if pr in back and pr not in after:
                 unflag(pr, "revisado")
             continue
-        found = WORK / pr / "achados.md"
-        if TRIAGE and found.exists() and found.stat().st_mtime >= started:  # triagem achou problema: vai ao corretor
+        if fresh:  # vai ao corretor
             (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since, "validador": pr in back}))
             sent += 1
             state.pop(pr, None)
