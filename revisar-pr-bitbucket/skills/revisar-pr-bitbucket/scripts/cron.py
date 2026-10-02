@@ -34,9 +34,11 @@ Ambiente (além das credenciais que a skill pede):
   CORRETOR_CLAUDE     se definido, a rodada é de triagem: PR aprovado é aprovado, e PR com achado
                       não recebe comentário — os achados vão para a fila do corretor
                       ($REVISOR_DIR/trabalho/correcao/<pr>/), que `corrigir.py` consome. PR na fila
-                      fica fora das rodadas até a correção terminar ou o PR mudar.
+                      fica fora das rodadas até a correção terminar ou o PR mudar. O corretor não
+                      tem cron: esta rodada o dispara assim que termina, se houver PR na fila e
+                      nenhum corretor rodando (saída dele em $REVISOR_DIR/corretor.log).
 """
-import datetime, json, os, pathlib, shlex, shutil, subprocess, sys
+import datetime, fcntl, json, os, pathlib, shlex, shutil, subprocess, sys
 
 import bitbucket
 
@@ -108,6 +110,21 @@ def in_correction(base, pr, commit):
     return False
 
 
+def wake():
+    """Gatilho do corretor: com PR na fila e nenhum corretor rodando, sobe um, solto desta rodada.
+    Se já há um rodando, ele mesmo esvazia a fila."""
+    if not (TRIAGE and WORK.is_dir() and any((d / "marca.json").exists() for d in WORK.iterdir() if d.name.isdigit())):
+        return
+    with open(DIR / "corretor.lock", "w") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return
+    with open(DIR / "corretor.log", "a") as out:
+        subprocess.Popen([sys.executable, str(HERE / "corrigir.py")], cwd=CLONE, stdin=subprocess.DEVNULL,
+                         stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+
+
 def to_review():
     """PRs que `bitbucket.py list` marca REVISAR: {pr: commit atual da branch de origem}."""
     r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), "list", "--dest", DEST,
@@ -158,6 +175,7 @@ def main():
         if not URGENT:
             log(f"nada a revisar ({len(blocked)} fora das rodadas por falta de veredito"
                 + (f", {len(waiting)} na fila do corretor)" if TRIAGE else ")"))
+        wake()
         return
 
     log(f"rodada{' urgente' if URGENT else ''}: {', '.join('#' + pr for pr in todo)}"
@@ -201,6 +219,7 @@ def main():
     STATE.write_text(json.dumps(state, indent=1))
     log(f"fim ({end}): {done} de {len(todo)} saíram do REVISAR" + (f", {sent} para o corretor" if TRIAGE else "")
         + f"; saída em {out}")
+    wake()
 
 
 if __name__ == "__main__":

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Esteira de correção: leva ao corretor os PRs que a triagem do revisor deixou com achado.
 
-Uso (crontab, com lock próprio — não disputa com as rodadas de revisão):
-  */10 8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/corretor.lock python3 <skill>/scripts/corrigir.py >> ~/revisor/corretor.log 2>&1
+Não tem cron: a rodada de triagem (`cron.py`) dispara este script assim que termina, se deixou PR
+na fila. Sem argumento ele esvazia a fila, um PR por vez, e sai. Um lock próprio
+($REVISOR_DIR/corretor.lock) garante um corretor só de cada vez, sem disputar com as rodadas de revisão.
 
 À mão:
   corrigir.py --pr 123            só este PR (precisa estar na fila)
@@ -28,7 +29,7 @@ Ambiente (além do que cron.py já usa):
   CORRETOR_CLAUDE     comando do Claude Code do corretor, com as permissões dele (obrigatório)
   CORRETOR_DIR        onde ficam as cópias das branches (padrão: ~/corretor)
   CORRETOR_VOLTAS     voltas corretor/revisor por PR (padrão: 5)
-  CORRETOR_MAX        PRs por execução (padrão: 1)
+  CORRETOR_MAX        PRs por execução (padrão: 10)
   CORRETOR_TIMEOUT    minutos até cortar cada sessão (padrão: 40)
   CORRETOR_VERIFICAR  comando de verificação que o corretor deve rodar na cópia (ex.: um script
                       que compila e roda os testes); entra no pedido
@@ -40,7 +41,7 @@ Ambiente (além do que cron.py já usa):
                       a nenhuma sessão do Claude. Sem ele, o push usa o remoto do clone e tudo o que é
                       escrito no PR sai com a credencial do revisor.
 """
-import argparse, datetime, json, os, pathlib, re, shlex, shutil, subprocess, sys
+import argparse, datetime, fcntl, json, os, pathlib, re, shlex, shutil, subprocess, sys
 
 import bitbucket
 
@@ -52,7 +53,7 @@ TREES = pathlib.Path(os.environ.get("CORRETOR_DIR", "~/corretor")).expanduser()
 REVISOR = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
 CORRETOR = shlex.split(os.environ.get("CORRETOR_CLAUDE", ""))
 VOLTAS = int(os.environ.get("CORRETOR_VOLTAS", "5"))
-MAX = int(os.environ.get("CORRETOR_MAX", "1"))
+MAX = int(os.environ.get("CORRETOR_MAX", "10"))
 TIMEOUT = int(os.environ.get("CORRETOR_TIMEOUT", "40")) * 60
 VERIFY = os.environ.get("CORRETOR_VERIFICAR")
 FIXER_TOKEN = os.environ.get("CORRETOR_BITBUCKET_TOKEN")
@@ -160,6 +161,7 @@ def correct(base, pr, dry):
         log(f"#{pr}: fora da fila ({d['state'] if st == 200 else f'ERRO {st}'})")
         return archive(work, pr)
     branch, dest = d["source"]["branch"]["name"], d["destination"]["branch"]["name"]
+    git("fetch", "origin", "--prune", "-q")
     head = git("rev-parse", "--short=12", f"origin/{branch}")[1]
     mark = json.loads((work / "marca.json").read_text())
     if mark["commit"] != head:
@@ -313,6 +315,8 @@ def main():
     os.chdir(CLONE)
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
     (DIR / "rodadas").mkdir(parents=True, exist_ok=True)
+    lock = open(DIR / "corretor.lock", "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)  # espera o corretor que estiver rodando
     todo = queue() if not (a.pr or a.reabrir) else [a.pr or a.reabrir]
     if not todo:
         return
@@ -329,8 +333,12 @@ def main():
             {"commit": head, "desde": datetime.datetime.now(datetime.timezone.utc).isoformat(), "reaberto": True}))
     elif a.pr and a.pr not in queue():
         sys.exit(f"PR #{a.pr} não está na fila de correção ({WORK})")
-    for pr in todo[:MAX]:
+    seen = set()
+    while todo and len(seen) < MAX:  # a fila pode crescer enquanto um PR é corrigido
+        pr = todo[0]
+        seen.add(pr)
         correct(base, pr, a.ensaio)
+        todo = [] if a.pr or a.reabrir else [p for p in queue() if p not in seen]
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "name": "revisar-pr-bitbucket",
   "description": "Reviews Bitbucket pull requests against three questions only — does it fix the YouTrack ticket, does it break something in or out of scope (database included), does it open a security hole — then applies the verdict: comment + request changes when it needs work, approve (never merge) when it doesn't. Includes corrigir-pr, a fixer that resolves the reviewer's findings on a local copy of the branch before the dev is asked for changes.",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "author": {
     "name": "arianecasas"
   },
