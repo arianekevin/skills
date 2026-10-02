@@ -11,7 +11,8 @@ sem fetch, sem chamar o Claude e sem escrever no log.
 
 O que faz:
   1. `git fetch` no clone e `bitbucket.py list --dest <destino>`. Sem PR marcado REVISAR, sai sem
-     chamar o Claude.
+     chamar o Claude. PR a revisar que conflita com o destino atual não é revisado: recebe request
+     changes pedindo a atualização da branch (o código que vai entrar ainda não existe).
   2. Chama `claude -p` com a skill sobre os PRs a revisar (no máximo $REVISOR_MAX por rodada).
   3. Lista de novo. PR que entrou na rodada e continua REVISAR no mesmo commit ficou sem veredito
      (inconclusivo, erro ao aplicar, rodada cortada): conta uma tentativa.
@@ -125,6 +126,31 @@ def wake():
                          stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
 
 
+def conflicts(commit):
+    """Arquivos em que o PR conflita com o destino atual (lista vazia: entra limpo)."""
+    r = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", "--no-messages", f"origin/{DEST}", commit],
+                       cwd=CLONE, capture_output=True, text=True)
+    return r.stdout.splitlines()[1:] if r.returncode == 1 else []
+
+
+def hold(pr, files):
+    """PR em conflito com o destino: comentário + request changes, sem chamar o Claude. Devolve se segurou."""
+    if not files:
+        return False
+    text = DIR / "rodadas" / f"conflito-{pr}.md"
+    text.write_text(f"## PR (#{pr})\n⚠️ **O PR conflita com a `{DEST}` atual; não revisei.** O conflito está em:\n"
+                    + "\n".join(f"- `{f}`" for f in files)
+                    + f"\n\nAtualize a branch em cima da `{DEST}` e resolva o conflito. A revisão vale para o código que vai "
+                    "entrar, e com conflito ele ainda não existe. Com o commit novo, o PR volta para a revisão.\n")
+    for cmd, arg in (("comment", str(text)), ("request-changes", pr)):
+        r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, arg], cwd=CLONE, capture_output=True, text=True)
+        if r.returncode != 0 or not r.stdout.strip().endswith("ok"):
+            log(f"#{pr}: conflita com a {DEST}, mas {cmd} falhou ({(r.stdout + r.stderr).strip()[:160]}); segue para a revisão")
+            return False
+    log(f"#{pr}: conflita com a {DEST} ({len(files)} arquivo(s)); request changes pedindo a atualização da branch")
+    return True
+
+
 def to_review():
     """PRs que `bitbucket.py list` marca REVISAR: {pr: commit atual da branch de origem}."""
     r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), "list", "--dest", DEST,
@@ -169,6 +195,9 @@ def main():
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
     waiting = [pr for pr in before if TRIAGE and pr not in blocked and in_correction(base, pr, before[pr])]
+    for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
+        if not URGENT and hold(pr, conflicts(before[pr])):
+            del before[pr]
     todo = [pr for pr in before if pr not in blocked and pr not in waiting][:MAX]
     if not todo:
         STATE.write_text(json.dumps(state, indent=1))
