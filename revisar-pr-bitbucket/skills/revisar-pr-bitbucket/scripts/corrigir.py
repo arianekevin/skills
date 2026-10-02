@@ -73,11 +73,11 @@ SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|BITBUCKET_|YOUTRACK_|TEAMCITY_")
 
 HEAD = "Rodada automática, sem ninguém acompanhando: não pergunte nada. "
 ASK_FIX = ("/revisar-pr-bitbucket:corrigir-pr " + HEAD + "PR #{pr} ({branch} -> {dest}), volta {v} de {n}. O diretório atual é a sua "
-           "cópia da branch. Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{verify} Escreva "
+           "cópia da branch. Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{context}{verify} Escreva "
            "{work}/resposta.md e, se mudar código, {work}/commit.txt. Responda em português.")
 ASK_GATE = ("/revisar-pr-bitbucket " + HEAD + "Modo portão, PR #{pr} ({branch} -> {dest}), volta {v} de {n}{last}. "
             "O diretório atual é a cópia da branch com a mudança do corretor sem commit. Pasta: {work} "
-            "(achados.md e resposta.md). Tickets (JSON): {issues}. Entregue {work}/veredito.json e regrave "
+            "(achados.md e resposta.md). Tickets (JSON): {issues}.{context} Entregue {work}/veredito.json e regrave "
             "{work}/achados.md. Responda em português.")
 
 
@@ -253,7 +253,10 @@ def correct(base, pr, dry):
     log(f"#{pr}: correção{' (ensaio)' if dry else ''}, {branch} em {head}")
 
     safe = {k: v for k, v in os.environ.items() if not SECRET.search(k) or k == "CLAUDE_CODE_OAUTH_TOKEN"}
+    # o caminho vai no pedido: deixado por conta da skill, o contexto do projeto não era lido nestas sessões
+    ctx = pathlib.Path("~/.claude/revisar-pr-bitbucket/contexto").expanduser() / f"{bitbucket.resolve_repo(None).split('/')[-1]}.md"
     fmt = dict(pr=pr, branch=branch, dest=dest, n=VOLTAS, work=work, issues=issues,
+               context=f" Antes de tudo, leia o contexto do projeto: {ctx}." if ctx.exists() else "",
                verify=f" Para verificar, rode na cópia: {VERIFY}" if VERIFY else "")
     verdict, fresh = None, False  # fresh: o achados.md é texto do revisor, já discutido com o corretor
     for v in range(1, VOLTAS + 1):
