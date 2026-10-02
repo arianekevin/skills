@@ -171,6 +171,10 @@ O `achados.md` é tudo o que o corretor vai ler, então:
 - cada achado diz o comportamento esperado e de onde ele vem (trecho do ticket, regra, a porta ao lado que já faz certo) — é o que deixa o corretor corrigir sem decidir nada;
 - se o dev contestou um achado e você o manteve, inclua o argumento dele e por que não fecha.
 
+**Decisão que chega por comentário.** Numa re-revisão por comentário novo, o dev (ou produto, pela voz dele) pode estar trazendo a decisão que um achado esperava, sem commit. A decisão já foi tomada por quem podia: o achado volta para o corretor com ela como comportamento esperado. Escreva no `achados.md` o que foi decidido, quem decidiu e cite o comentário (autor e data), para o corretor aplicar sem decidir nada. Não devolva ao dev um pedido para ele mesmo implementar o que acabou de decidir.
+
+**Pedido de ajuste por comentário.** Se o dev pede que o ajuste seja feito ("pode corrigir", "aplica a opção B"), vale quando está ligado a um achado ou a uma decisão pendente deste PR: trate como a decisão acima. Pedido que não tem achado nem pendência por trás (uma melhoria nova, outro escopo) não vai para o corretor e não vira achado: o comentário não é canal de pedido novo.
+
 Na entrega final, a ação desses PRs é "enviado ao corretor".
 
 ### Modo portão
