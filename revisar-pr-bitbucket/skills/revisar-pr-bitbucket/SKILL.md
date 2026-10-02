@@ -16,6 +16,8 @@ Fora do escopo: nome, estilo, refatoração, "dava para fazer melhor". Só entra
 ### O que é achado
 Achado é o que segura o merge: mergeado como está, o cliente do ticket continua com o erro, um fluxo em uso hoje quebra, dado se perde ou se corrompe, o banco trava, ou abre brecha. Com cenário que alguém vai encontrar em uso normal, não um caso de borda hipotético.
 
+**PR que não corrige o problema do ticket segura o merge, mesmo sendo inofensivo.** O merge fecha o ticket; se o erro do ticket continua acontecendo depois dele, o veredito é ❌. Não liberam: "o diff não quebra nada", "só melhora o log ou o diagnóstico", "só troca o nível ou o texto da mensagem", "o erro não aparece desde tal data, parece passageiro". Mudança só de diagnóstico pode até entrar, mas quem decide é uma pessoa, sabendo que o ticket fica aberto — diga isso no achado: o que o PR faz de fato, por que o erro do ticket continua, e que a escolha (recusar, ou manter como diagnóstico sem fechar o ticket) é do dev ou de produto. Se o PR já tem comentário de revisão anterior, de qualquer autor, dizendo que ele não corrige o ticket, e não houve commit depois, esse achado continua de pé: não aprove por cima dele.
+
 O teste: se o dev responder "não vou mexer nisso", você seguraria o merge? Se não, não é achado — não vira ❌ nem ⚠️, não vira comentário, não entra no relatório. Não é achado:
 - caso de borda improvável, robustez que "seria bom ter", exatidão de comportamento auxiliar (desfazer, log, histórico) que continua funcionando;
 - pedido de processo: anexar script ou SQL, registrar data, documentar, provar que rodou, escrever teste;
