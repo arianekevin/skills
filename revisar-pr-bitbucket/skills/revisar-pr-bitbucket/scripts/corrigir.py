@@ -34,6 +34,11 @@ Ambiente (além do que cron.py já usa):
   CORRETOR_TIMEOUT    minutos até cortar cada sessão (padrão: 40)
   CORRETOR_VERIFICAR  comando de verificação que o corretor deve rodar na cópia (ex.: um script
                       que compila e roda os testes); entra no pedido
+  CORRETOR_SUITE      comando que roda a suíte completa de testes na cópia e imprime, um por linha,
+                      os testes que falharam; saída diferente de 0 = a suíte não rodou (não compilou).
+                      Com ele, a suíte roda antes da correção e de novo depois que o revisor aceita a
+                      mudança: teste que passava e passou a falhar volta para o corretor como achado,
+                      e sem resolver nada é publicado. Teste que já falhava na branch não conta.
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
   CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
                       requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
@@ -58,6 +63,7 @@ MAX = int(os.environ.get("CORRETOR_MAX", "10"))
 TIMEOUT = int(os.environ.get("CORRETOR_TIMEOUT", "40")) * 60
 VERIFY = os.environ.get("CORRETOR_VERIFICAR")
 FIXER_TOKEN = os.environ.get("CORRETOR_BITBUCKET_TOKEN")
+SUITE = os.environ.get("CORRETOR_SUITE")
 TICKET = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
 SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|BITBUCKET_|YOUTRACK_|TEAMCITY_")
 
@@ -93,6 +99,30 @@ def session(cmd, prompt, cwd, env, out):
             return f"saiu com {r.returncode}"
         except subprocess.TimeoutExpired:
             return f"cortada aos {TIMEOUT // 60} min"
+
+
+def suite(tree, out):
+    """Roda a suíte completa na cópia. Devolve o conjunto dos testes que falharam, ou None se não rodou."""
+    with open(out, "w") as err:
+        try:
+            r = subprocess.run(SUITE, shell=True, cwd=tree, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=err, text=True, timeout=TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return None
+    return {line.strip() for line in r.stdout.splitlines() if line.strip()} if r.returncode == 0 else None
+
+
+def broken(tree, base, hist):
+    """Testes que passavam na branch e falham com a mudança. Vazio: nada quebrou.
+    Só conta o que falha em duas rodadas seguidas (teste instável não segura a correção)."""
+    after = suite(tree, hist / "suite-depois.log")
+    if after is None:
+        return ["a suíte não rodou com a mudança (não compila?) — veja a verificação"]
+    new = after - base
+    if new:
+        again = suite(tree, hist / "suite-depois-2.log")
+        new &= again if again is not None else new
+    return sorted(new)
 
 
 def queue():
@@ -179,11 +209,14 @@ def correct(base, pr, dry):
         log(f"#{pr}: não consegui criar a cópia da branch: {out[:200]}")
         return
     log(f"#{pr}: correção{' (ensaio)' if dry else ''}, {branch} em {head}")
+    base = suite(tree, work / "suite-antes.log") if SUITE else None
+    if SUITE:
+        log(f"#{pr}: suíte antes da correção: " + ("não rodou; a comparação fica sem efeito" if base is None else f"{len(base)} teste(s) já falhando"))
 
     safe = {k: v for k, v in os.environ.items() if not SECRET.search(k) or k == "CLAUDE_CODE_OAUTH_TOKEN"}
     fmt = dict(pr=pr, branch=branch, dest=dest, n=VOLTAS, work=work, issues=issues,
                verify=f" Para verificar, rode na cópia: {VERIFY}" if VERIFY else "")
-    verdict = None
+    verdict, fresh = None, False  # fresh: o achados.md é texto do revisor, já discutido com o corretor
     for v in range(1, VOLTAS + 1):
         stamp = f"{datetime.datetime.now():%Y%m%d-%H%M}"
         hist = work / "voltas" / str(v)
@@ -212,11 +245,27 @@ def correct(base, pr, dry):
             continue
         shutil.copy(work / "veredito.json", hist / "veredito.json")
         shutil.copy(work / "achados.md", hist / "achados-saida.md")
+        fresh = True
         log(f"#{pr}: volta {v}, {verdict['estado']}: {str(verdict.get('motivo', ''))[:160]}")
-        if verdict["estado"] in ("aprovado", "parcial"):
+        if verdict["estado"] not in ("aprovado", "parcial"):
+            continue
+        broke = broken(tree, base, hist) if base is not None and git("status", "--porcelain", cwd=tree)[1] else []
+        if not broke:
             break
+        log(f"#{pr}: volta {v}, a mudança quebrou {len(broke)} teste(s) que passavam: {', '.join(broke)[:200]}")
+        (hist / "suite-quebrou.txt").write_text("\n".join(broke) + "\n")
+        verdict = None
+        if v == VOLTAS:  # sem volta para consertar: a mudança é descartada e vale o que o revisor achou no início
+            shutil.copy(work / "voltas" / "1" / "achados-entrada.md", work / "achados.md")
+            fresh = not json.loads((work / "marca.json").read_text()).get("reaberto")
+            break
+        (work / "achados.md").write_text(
+            body(work, pr)[0] + "\n\n❌ **A sua mudança quebrou testes que passavam na branch.** A suíte completa rodou antes e "
+            "depois da mudança; estes passavam e agora falham:\n" + "\n".join(f"- `{x}`" for x in broke)
+            + "\n\nConserte a mudança, não o teste. Se o teste está certo e a correção não cabe sem mexer nele, desfaça a "
+            "mudança daquele achado e responda DECISÃO.\n")
 
-    publish(pr, branch, head, tree, work, verdict, dry)
+    publish(pr, branch, head, tree, work, verdict, dry, fresh)
     if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade
         (work / "marca.json").rename(work / "marca-ensaio.json")
     else:
@@ -224,7 +273,7 @@ def correct(base, pr, dry):
         archive(work, pr)
 
 
-def publish(pr, branch, head, tree, work, verdict, dry):
+def publish(pr, branch, head, tree, work, verdict, dry, fresh):
     state = verdict["estado"] if verdict and verdict["estado"] in ("aprovado", "parcial") else "sem acordo"
     changed = bool(git("status", "--porcelain", cwd=tree)[1]) and state != "sem acordo"
     title, rest = body(work, pr)
@@ -260,11 +309,10 @@ def publish(pr, branch, head, tree, work, verdict, dry):
         mine, theirs = [], [*mine, "**O que ficou para você:**\n\n" + "\n\n".join(theirs)]
     posts = [(who, f"{title}\n" + "\n\n".join(parts) + "\n", work / name)
              for who, parts, name in ((True, mine, "comentario-corretor.md"), (False, theirs, "comentario.md")) if parts]
-    # PR reaberto sem nenhum veredito do portão: o achados.md ainda é o histórico de comentários do
+    # sem texto novo do revisor para um PR reaberto: o achados.md ainda é o histórico de comentários do
     # próprio PR, e o request changes já está lá. Não há nada novo a dizer.
-    reopened = json.loads((work / "marca.json").read_text()).get("reaberto")
-    if state == "sem acordo" and reopened and not list((work / "voltas").glob("*/achados-saida.md")):
-        log(f"#{pr}: sem veredito do portão; o PR fica como estava")
+    if state == "sem acordo" and not fresh and json.loads((work / "marca.json").read_text()).get("reaberto"):
+        log(f"#{pr}: sem acordo e sem texto novo do revisor; o PR fica como estava")
         return
     final = "approve" if state == "aprovado" else "request-changes"
     plan = f"{state}: " + ", ".join(x for x in (f"push do commit {commit}" if commit else "", f"{len(posts)} comentário(s)" if posts else "",
