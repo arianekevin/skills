@@ -18,6 +18,7 @@ deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
      por achado; o revisor, em modo portão, confere a mudança e a resposta e dá o veredito.
   3. Publica conforme o veredito:
      aprovado  commit + push + comentário do que foi corrigido + aprovação (sem mudança: só aprova)
+               o comentário lista também o que ficou de fora sem bloquear
      parcial   commit + push + comentário (o corrigido e o que ficou para o dev) + request changes
      sem acordo ao fim das voltas: descarta a mudança; comentário com os achados + request changes
   O commit vai em cima da branch, sem force-push. Se a branch andou no meio, nada é publicado e o
@@ -211,6 +212,7 @@ def publish(pr, branch, head, tree, work, verdict, dry):
     changed = bool(git("status", "--porcelain", cwd=tree)[1]) and state != "sem acordo"
     title, rest = body(work, pr)
     fixed = [str(x).strip() for x in (verdict or {}).get("corrigido", []) if str(x).strip()]
+    notes = [str(x).strip() for x in (verdict or {}).get("nao_bloqueia", []) if str(x).strip()] if state != "sem acordo" else []
     commit = None
     if changed:
         name, email = os.environ.get("CORRETOR_GIT_NAME"), os.environ.get("CORRETOR_GIT_EMAIL")
@@ -227,12 +229,16 @@ def publish(pr, branch, head, tree, work, verdict, dry):
             return
         commit = git("rev-parse", "--short=12", "HEAD", cwd=tree)[1]
 
-    text = ""
+    parts = []
     if commit:
-        text = (f"🔧 **Corrigido automaticamente no commit `{commit}`.**\n" + "\n".join(f"- {x}" for x in fixed)
-                + "\n\nPuxe a branch antes de continuar (`git pull --rebase`).")
+        parts.append(f"🔧 **Corrigido automaticamente no commit `{commit}`.**\n" + "\n".join(f"- {x}" for x in fixed))
     if state != "aprovado" and rest:
-        text += ("\n\n**O que ficou para você:**\n\n" if commit else "") + rest
+        parts.append(("**O que ficou para você:**\n\n" if commit else "") + rest)
+    if notes:
+        parts.append("ℹ️ **Ficou de fora, não bloqueia:**\n" + "\n".join(f"- {x}" for x in notes))
+    if commit:
+        parts.append("Puxe a branch antes de continuar (`git pull --rebase`).")
+    text = "\n\n".join(parts)
     # PR reaberto sem nenhum veredito do portão: o achados.md ainda é o histórico de comentários do
     # próprio PR, e o request changes já está lá. Não há nada novo a dizer.
     reopened = json.loads((work / "marca.json").read_text()).get("reaberto")

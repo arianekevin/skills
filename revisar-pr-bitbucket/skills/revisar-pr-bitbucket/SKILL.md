@@ -187,11 +187,13 @@ Entregue na mesma pasta:
 
 **`veredito.json`**
 ```json
-{"estado": "aprovado | parcial | reprovado", "corrigido": ["uma linha por correção que você aceitou"], "motivo": "uma frase"}
+{"estado": "aprovado | parcial | reprovado", "corrigido": ["uma linha por correção que você aceitou"], "nao_bloqueia": ["uma linha por pendência que não segura o merge"], "motivo": "uma frase"}
 ```
 - **aprovado:** nenhum achado de pé, e o PR com a mudança local (se houver) passa nas três perguntas.
 - **parcial:** a mudança local está boa e pode subir, e o que sobra depende de decisão de dev ou produto — o corretor não tem mais o que fazer.
 - **reprovado:** há achado de pé ou problema na mudança, e o corretor ainda pode agir.
+
+`nao_bloqueia` é o que vai avisado ao dev sem segurar o PR: pendência real que o corretor levantou ou que sobrou de um achado, não foi corrigida e não passa no teste de "O que é achado" (dado antigo que continua como estava, corrida que a mudança reduz mas não elimina, decisão que pode esperar). Uma linha cada, dizendo o que ficou e o que resolveria. Não é lugar de estilo nem de sugestão de melhoria; sem pendência assim, lista vazia.
 
 **`achados.md`**, regravado:
 - aprovado: vazio (só o cabeçalho);
