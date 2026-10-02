@@ -18,7 +18,7 @@ deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
   1. Cria uma cópia da branch (git worktree) em $CORRETOR_DIR/pr-<pr>.
   2. Até $CORRETOR_VOLTAS voltas: o corretor (skill corrigir-pr) mexe na cópia e responde achado
      por achado; o revisor, em modo portão, confere a mudança e a resposta e dá o veredito.
-  3. Publica conforme o veredito:
+  3. Publica conforme o veredito. Quem comenta é sempre o revisor, num comentário só; o corretor só dá push:
      aprovado  commit + push + comentário do que foi corrigido + aprovação (sem mudança: só aprova)
                o comentário lista também o que ficou de fora sem bloquear
      parcial   commit + push + comentário (o corrigido e o que ficou para o dev) + request changes
@@ -46,8 +46,8 @@ Ambiente (além do que cron.py já usa):
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
   CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
                       requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
-                      e o comentário do que foi corrigido saem com o nome desse token, e a aprovação ou
-                      o request changes continuam saindo com a credencial do revisor. O token não chega
+                      sai com o nome desse token; o comentário e a aprovação ou o request changes
+                      saem com a credencial do revisor. O token não chega
                       a nenhuma sessão do Claude. Sem ele, o push usa o remoto do clone e tudo o que é
                       escrito no PR sai com a credencial do revisor.
 """
@@ -355,10 +355,12 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
         (mine if commit else theirs).append("ℹ️ **Ficou de fora, não bloqueia:**\n" + "\n".join(f"- {x}" for x in notes))
     if commit:
         mine.append("Puxe a branch antes de continuar (`git pull --rebase`).")
-    if not FIXER_TOKEN and mine and theirs:  # uma identidade só: um comentário só
-        mine, theirs = [], [*mine, "**O que ficou para você:**\n\n" + "\n\n".join(theirs)]
-    posts = [(who, f"{title}\n" + "\n\n".join(parts) + "\n", work / name)
-             for who, parts, name in ((True, mine, "comentario-corretor.md"), (False, theirs, "comentario.md")) if parts]
+    # uma voz só no PR: quem comenta é o revisor, que acionou o corretor e conferiu a mudança; o corretor só dá push.
+    # O que foi corrigido fica também num arquivo à parte, para quem acionou a rodada (o validador) citar.
+    if mine:
+        (work / "comentario-corretor.md").write_text(f"{title}\n" + "\n\n".join(mine) + "\n")
+    parts = [*mine, "**O que ficou para você:**\n\n" + "\n\n".join(theirs)] if mine and theirs else mine or theirs
+    posts = [(False, f"{title}\n" + "\n\n".join(parts) + "\n", work / "comentario.md")] if parts else []
     # sem texto novo do revisor para um PR reaberto: o achados.md ainda é o histórico de comentários do
     # próprio PR, e o request changes já está lá. Não há nada novo a dizer.
     if state == "sem acordo" and not fresh and json.loads((work / "marca.json").read_text()).get("reaberto"):
@@ -396,9 +398,9 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
             time.sleep(2)
         time.sleep(3)
     done = [f"push do commit {commit}"] if commit else []
-    for who, _, path in [] if quiet else posts:  # o do corretor primeiro: a marca do revisor fecha a conversa
+    for who, _, path in [] if quiet else posts:  # o comentário antes da marca: a marca do revisor fecha a conversa
         ok, out = write("comment", str(path), fixer=who)
-        done.append(f"comentário do {'corretor' if who else 'revisor'}" if ok else f"comentário FALHOU ({out[:120]})")
+        done.append("comentário do revisor" if ok else f"comentário FALHOU ({out[:120]})")
     ok, out = write(final, pr)
     done.append(("aprovação" if final == "approve" else "request changes") if ok else f"{final} FALHOU ({out[:120]})")
     log(f"#{pr}: {state} — " + ", ".join(done))
