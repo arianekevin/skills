@@ -173,7 +173,7 @@ def validator(pr):
     if not cmd:
         return log(f"#{pr}: na fila do validador (REVISOR_VALIDAR ausente: fica para o cron dele)")
     log(f"#{pr}: validador chamado; aguardando")
-    subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
+    subprocess.run(["flock", "/tmp/testador-prova.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
                    cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
     log(f"#{pr}: validador terminou: " + subprocess.run(["bash", "-c", f"grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200"],
                                                         capture_output=True, text=True).stdout.strip())
@@ -349,7 +349,7 @@ def main():
     with open(out, "w") as fh:
         try:
             r = subprocess.run([*CLAUDE, "-p", prompt], cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT,
-                               env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
+                               env={k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")})
             end = f"claude saiu com {r.returncode}"
         except subprocess.TimeoutExpired:
             end = f"cortada aos {TIMEOUT // 60} min"

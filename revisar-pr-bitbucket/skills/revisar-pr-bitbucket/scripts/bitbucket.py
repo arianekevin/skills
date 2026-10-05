@@ -24,6 +24,12 @@ Credenciais, uma das duas:
   - $BITBUCKET_EMAIL e $BITBUCKET_API_TOKEN: API token do Atlassian, com read:pullrequest:bitbucket
     + write:pullrequest:bitbucket. Age como o dono do token.
 Nunca recusa (decline) nem faz merge.
+
+Ticket do PR: com $YOUTRACK_WRITE_TOKEN, $YOUTRACK_URL, $REVISOR_TICKET_PROJETOS (ex.: "LAT") e
+$REVISOR_TICKET_REWORK (ex.: "Needs rework") no ambiente, cada request changes aplicado também vai ao
+ticket desses projetos citado na branch ou no título: comentário com o link do PR e o último comentário
+do PR (o do revisor, postado antes da marca), e o estado vira $REVISOR_TICKET_REWORK, salvo ticket já
+resolvido.
 Só entra na análise PR aberto, fora de draft e sem revisão ativa (request changes ou aprovação): `find`, `info`
 e `list` marcam REVISAR ou PULAR: <motivo>, e `comment`, `request-changes` e `approve` recusam
 o resto. Revisão anterior ao último commit do PR, ou a um comentário de quem não é o revisor,
@@ -258,6 +264,47 @@ def changed_files(dest, branch):
     return None if out is None else set(filter(None, out.splitlines()))
 
 
+def youtrack(method, path, body=None):
+    url = os.environ["YOUTRACK_URL"].rstrip("/") + "/api/" + path
+    req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body else None,
+                                 headers={"Authorization": f"Bearer {os.environ['YOUTRACK_WRITE_TOKEN']}",
+                                          "Accept": "application/json", "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        raw = r.read()
+        return json.loads(raw) if raw else None
+
+
+def ticket_rework(base, pr):
+    """Request changes aplicado: o ticket do PR recebe o porquê e vai para o estado de retrabalho."""
+    target = os.environ.get("REVISOR_TICKET_REWORK")
+    projects = {p.strip() for p in os.environ.get("REVISOR_TICKET_PROJETOS", "").split(",") if p.strip()}
+    if not (target and projects and os.environ.get("YOUTRACK_WRITE_TOKEN") and os.environ.get("YOUTRACK_URL")):
+        return
+    st, d = call("GET", f"{base}/{pr}")
+    if st != 200:
+        return
+    ids = sorted({t for t in re.findall(r"\b([A-Z][A-Z0-9]+-\d+)\b", d["source"]["branch"]["name"] + " " + d["title"])
+                  if t.split("-")[0] in projects})
+    if not ids:
+        return
+    said = [c for c in paginate(f"{base}/{pr}/comments", {"pagelen": 100}) if not c.get("deleted")]
+    said = said[-1]["content"]["raw"].strip() if said else ""
+    text = (f"O PR #{pr} recebeu pedido de mudança na revisão automática: {d['links']['html']['href']}\n\n"
+            + (said or "(sem comentário no PR)"))
+    for t in ids:
+        try:
+            i = youtrack("GET", f"issues/{t}?fields=customFields(name,$type,value(name,isResolved))")
+            field = next(f for f in i["customFields"] if f["name"] == "State")
+            youtrack("POST", f"issues/{t}/comments?fields=id", {"text": text})
+            if (field.get("value") or {}).get("isResolved") or (field.get("value") or {}).get("name") == target:
+                print(f"ticket {t}: comentário (estado mantido: {(field.get('value') or {}).get('name')})")
+                continue
+            youtrack("POST", f"issues/{t}?fields=id", {"customFields": [{"name": "State", "$type": field["$type"], "value": {"name": target}}]})
+            print(f"ticket {t}: comentário e State = {target}")
+        except Exception as e:  # o PR já está marcado; o ticket não segura nada
+            print(f"ticket {t}: FALHOU ({str(e)[:160]})")
+
+
 def post_state(base, pr, action, isolated=False):
     if not guard(base, pr, isolated):
         return
@@ -265,6 +312,8 @@ def post_state(base, pr, action, isolated=False):
     if st == 400:  # logo após comentar o Bitbucket às vezes devolve 400; a segunda tentativa passa
         time.sleep(3)
         st, d = call("POST", f"{base}/{pr}/{action}")
+    if st == 200 and action == "request-changes":
+        ticket_rework(base, pr)  # antes do "ok": quem chama confere que a saída termina em ok
     print(pr, "ok" if st == 200 else f"ERRO {st} {d}")
 
 
