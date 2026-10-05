@@ -411,7 +411,7 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
         log(f"#{pr}: aprovado — " + ", ".join(done + ["para o validador, sem aprovação no Bitbucket"]))
         cmd = os.environ.get("REVISOR_VALIDAR")
         if cmd:  # o validador prova agora; o corretor espera, como a rodada do revisor espera
-            subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} >> \"$HOME/testador/cron.log\" 2>&1"],
+            subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
                            cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
             log(f"#{pr}: validador terminou")
         return

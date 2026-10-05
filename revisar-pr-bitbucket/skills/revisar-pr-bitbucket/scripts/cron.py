@@ -77,6 +77,7 @@ FLAGS = DIR / "trabalho" / "validacao"
 # e quem aprova e faz o merge é o validador, depois de provar
 HANDOFF = TRIAGE and os.environ.get("REVISOR_VALIDADOR") == "1"
 VQUEUE = DIR / "trabalho" / "validacao-fila"
+PROVEN = DIR / "trabalho" / "validacao-provada"  # PR aprovado à mão que o validador já provou: falta o veredito do revisor
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
@@ -149,6 +150,22 @@ def in_correction(base, pr, commit):
     return False
 
 
+def proven(base, before):
+    """PRs aprovados à mão que o validador provou, no commit em que estão: entram na rodada para o veredito
+    do revisor (a aprovação de quem aprovou fica; se a revisão achar problema, o request changes pesa mais)."""
+    found = []
+    for d in sorted(PROVEN.iterdir()) if PROVEN.is_dir() else []:
+        if not (d.name.isdigit() and (d / "marca.json").exists()):
+            continue
+        st, info = bitbucket.call("GET", f"{base}/{d.name}", params={"fields": "state,source.commit.hash"})
+        if st != 200 or info["state"] != "OPEN" or json.loads((d / "marca.json").read_text())["commit"][:12] != info["source"]["commit"]["hash"][:12]:
+            shutil.rmtree(d, ignore_errors=True)
+            continue
+        before.setdefault(d.name, info["source"]["commit"]["hash"][:12])
+        found.append(d.name)
+    return found
+
+
 def validator(pr):
     """Chama o validador neste PR e espera (a rodada segura o lock do revisor enquanto isso). Sem o comando
     configurado, o PR fica na fila e o cron do validador o encontra."""
@@ -156,7 +173,7 @@ def validator(pr):
     if not cmd:
         return log(f"#{pr}: na fila do validador (REVISOR_VALIDAR ausente: fica para o cron dele)")
     log(f"#{pr}: validador chamado; aguardando")
-    subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} >> \"$HOME/testador/cron.log\" 2>&1"],
+    subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
                    cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
     log(f"#{pr}: validador terminou: " + subprocess.run(["bash", "-c", f"grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200"],
                                                         capture_output=True, text=True).stdout.strip())
@@ -269,6 +286,7 @@ def main():
     before = to_review()
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
     flags = [] if URGENT else flagged(base, before)
+    vetted = [] if URGENT or not HANDOFF else proven(base, before)
     if ONLY:
         before = {pr: commit for pr, commit in before.items() if pr == ONLY}
     for pr in REDO:
@@ -277,14 +295,14 @@ def main():
             before[pr] = info["source"]["commit"]["hash"][:12]
     if REDO:
         before = {pr: commit for pr, commit in before.items() if pr in REDO}
-    forced = set(flags) | set(REDO)  # entram na rodada mesmo sem estar no REVISAR
+    forced = set(flags) | set(REDO) | set(vetted)  # entram na rodada mesmo sem estar no REVISAR
     # a contagem vale enquanto o PR está como na última tentativa: commit ou atividade nova zera;
     # PR que saiu da lista some do estado (na via rápida a lista é parcial: o que não está nela fica)
     state = {pr: s for pr, s in state.items()
              if ((URGENT or ONLY or REDO) and pr not in before)
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
-    waiting = [pr for pr in before if TRIAGE and pr not in blocked and pr not in flags
+    waiting = [pr for pr in before if TRIAGE and pr not in blocked and pr not in flags and pr not in vetted
                and (in_correction(base, pr, before[pr]) or HANDOFF and in_validation(base, pr, before[pr]))]
     for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
         if not URGENT and hold(pr, conflicts(before[pr])):
@@ -310,6 +328,11 @@ def main():
               "provar;" if HANDOFF else "Aprove os que passarem;")
     prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK, passed=passed)
     back = [pr for pr in todo if pr in flags]
+    manual = [pr for pr in todo if pr in vetted]
+    if manual:
+        prompt += (f" {', '.join('#' + pr for pr in manual)} foram aprovados à mão por alguém e o validador já provou rodando "
+                   f"(o que ele provou está em {PROVEN}/<número do PR>/validacao.md). A aprovação dessa pessoa não é o seu "
+                   "veredito: revise do zero e decida você, com a prova como mais uma evidência.")
     again = []
     if forced & set(todo):
         prompt += (f" Os PRs {', '.join('#' + pr for pr in todo if pr in forced)} entram nesta rodada mesmo que a listagem os marque "
@@ -344,6 +367,8 @@ def main():
         fresh = TRIAGE and found.exists() and found.stat().st_mtime >= started  # a triagem achou problema
         verdict = VQUEUE / pr / "aprovado.md"
         to_validator = HANDOFF and not fresh and verdict.exists() and verdict.stat().st_mtime >= started  # passou
+        if pr in manual and not to_validator:
+            shutil.rmtree(PROVEN / pr, ignore_errors=True)  # sem o aval do revisor, a prova guardada não serve mais
         # PR forçado pode nunca ter estado no REVISAR (a aprovação de outro usuário continua lá): o veredito vale assim mesmo
         if after.get(pr) != before[pr] and not ((fresh or to_validator) and pr in forced and pr not in after):  # saiu do REVISAR, ou recebeu commit durante a rodada
             done += pr not in after
