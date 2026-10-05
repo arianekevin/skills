@@ -200,7 +200,7 @@ Entregue na mesma pasta:
 - **parcial:** a mudança local está boa e pode subir, e o que sobra depende de decisão de dev ou produto — o corretor não tem mais o que fazer.
 - **reprovado:** há achado de pé ou problema na mudança, e o corretor ainda pode agir.
 
-`nao_bloqueia` é o que vai avisado ao dev sem segurar o PR: pendência real que o corretor levantou ou que sobrou de um achado, não foi corrigida e não passa no teste de "O que é achado" (dado antigo que continua como estava, corrida que a mudança reduz mas não elimina, decisão que pode esperar). Uma linha cada, dizendo o que ficou e o que resolveria. Não é lugar de estilo nem de sugestão de melhoria; sem pendência assim, lista vazia.
+`nao_bloqueia` é o que vai avisado ao dev sem segurar o PR: pendência real que o corretor levantou ou que sobrou de um achado, não foi corrigida e não passa no teste de "O que é achado" (dado antigo que continua como estava, corrida que a mudança reduz mas não elimina, decisão que pode esperar). Uma linha cada, dizendo o que ficou e o que resolveria. Não é lugar de estilo nem de sugestão de melhoria; sem pendência assim, lista vazia. Também não é lugar do processo dos agentes: o que o corretor rodou ou deixou de rodar (lint, suíte, comando de verificação), quantas voltas houve, o que você conferiu. Isso não diz nada ao dev — a suíte completa é rodada à parte, por quem publica. Só entra o que é sobre o código ou o comportamento do sistema.
 
 **`achados.md`**, regravado:
 - aprovado: vazio (só o cabeçalho);
