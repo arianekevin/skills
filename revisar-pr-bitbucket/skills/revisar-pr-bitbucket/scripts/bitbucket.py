@@ -236,7 +236,8 @@ def paginate(path, params):
 def open_prs(base, dest=None, author=None, reviewer=None):
     # o estado vai dentro do `q`: com `q` presente, o parâmetro `state` solto é ignorado
     q = 'state="OPEN"' + (f' AND destination.branch.name="{dest}"' if dest else "")
-    prs = paginate(base, {"q": q, "pagelen": 50,
+    # quem espera há mais tempo vem primeiro (sem `sort`, a API devolve o atualizado mais recente primeiro)
+    prs = paginate(base, {"q": q, "sort": "updated_on", "pagelen": 50,
                           "fields": "next,values.id,values.title,values.source.branch.name,values.destination.branch.name,"
                                     "values.author.display_name,values.author.nickname,values.draft,"
                                     "values.updated_on,values.comment_count,"
