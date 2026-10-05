@@ -80,6 +80,7 @@ FLAGS = DIR / "trabalho" / "validacao"
 HANDOFF = TRIAGE and os.environ.get("REVISOR_VALIDADOR") == "1"
 VQUEUE = DIR / "trabalho" / "validacao-fila"
 PROVEN = DIR / "trabalho" / "validacao-provada"  # PR aprovado à mão que o validador já provou: falta o veredito do revisor
+AGENT_BRANCH = os.environ.get("REVISOR_BRANCH_AGENTE", "agente/")  # branch dos PRs do agente de bugfix
 VERDICTS = DIR / "trabalho" / "vereditos"  # o que a rodada registra; o cron junta em vereditos.jsonl, com a hora
 CATEGORIES = {"nao_corrige_o_ticket", "parcial", "efeito_colateral", "quebra_teste", "seguranca", "desempenho_banco",
               "conflito", "decisao_de_produto", "outro"}
@@ -272,15 +273,16 @@ def to_review():
     if r.returncode != 0:
         warn(f"listagem falhou: {(r.stderr or r.stdout).strip()[:300]}")
         sys.exit(1)
-    prs = {}
+    prs, agent = {}, {}
     for line in r.stdout.splitlines():
         parts = line.split(" | ", 4)
         if len(parts) == 5 and parts[3].startswith("REVISAR"):
             branch = parts[1].split(" -> ")[0]
             h = subprocess.run(["git", "rev-parse", "--short=12", f"origin/{branch}"],
                                cwd=CLONE, capture_output=True, text=True)
-            prs[parts[0]] = h.stdout.strip() if h.returncode == 0 else "?"
-    return prs
+            # PR do agente de bugfix vai para o fim da fila: o de dev passa na frente
+            (agent if branch.startswith(AGENT_BRANCH) else prs)[parts[0]] = h.stdout.strip() if h.returncode == 0 else "?"
+    return {**prs, **agent}
 
 
 def keep_verdicts(record, out):
