@@ -158,6 +158,24 @@ Releia o arquivo antes de postar (o dev pode ter editado). Confira a saída de c
 
 Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado + request changes / aprovado / nada / pulado: fechado ou revisão ativa).
 
+### Registro do veredito
+Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisado (pulado não entra), no fim da revisão, valha o modo que for:
+```json
+{"pr": 123, "commit": "<hash curto revisado>", "veredito": "aprovado | ajuste | inconclusivo", "categorias": ["..."]}
+```
+`categorias`: uma por tipo de achado de pé (❌/⚠️), sem repetir; lista vazia se aprovado ou inconclusivo. Só destes valores:
+- `nao_corrige_o_ticket`: o erro do ticket continua (não toca o ponto que falha, só mexe em log ou mensagem, correção desfeita)
+- `parcial`: corrige um caminho do ticket e deixa outro citado nele
+- `efeito_colateral`: a correção quebra ou muda outro comportamento (dado perdido ou sobrescrito, fluxo vizinho, regressão)
+- `quebra_teste`: teste que passava falha com o PR
+- `seguranca`: brecha, permissão, tenant cruzado, dado de outra conta
+- `desempenho_banco`: lock, consulta pesada, conexão ou timeout
+- `conflito`: conflito com o destino
+- `decisao_de_produto`: o PR introduz comportamento que produto precisa confirmar
+- `outro`: achado que não cabe acima
+
+O registro é estatística da esteira, não muda o veredito nem o comentário.
+
 ## Com corretor (modo triagem e modo portão)
 
 Só quando o pedido disser **modo triagem** ou **modo portão**. Há um agente corretor (skill `corrigir-pr`) entre a revisão e o dev: o dev só recebe pedido de mudança depois que o corretor tentou corrigir ou contestou o achado. Quem conduz as voltas, publica a mudança e escreve no Bitbucket é quem chamou; você só revisa.

@@ -80,6 +80,9 @@ FLAGS = DIR / "trabalho" / "validacao"
 HANDOFF = TRIAGE and os.environ.get("REVISOR_VALIDADOR") == "1"
 VQUEUE = DIR / "trabalho" / "validacao-fila"
 PROVEN = DIR / "trabalho" / "validacao-provada"  # PR aprovado à mão que o validador já provou: falta o veredito do revisor
+VERDICTS = DIR / "trabalho" / "vereditos"  # o que a rodada registra; o cron junta em vereditos.jsonl, com a hora
+CATEGORIES = {"nao_corrige_o_ticket", "parcial", "efeito_colateral", "quebra_teste", "seguranca", "desempenho_banco",
+              "conflito", "decisao_de_produto", "outro"}
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
@@ -280,6 +283,24 @@ def to_review():
     return prs
 
 
+def keep_verdicts(record, out):
+    """Junta o registro da rodada em vereditos.jsonl (histórico para estatística), com a hora e a rodada.
+    Linha inválida ou categoria fora da lista é guardada como 'outro', para não perder o PR."""
+    if not record.exists():
+        return
+    with open(DIR / "vereditos.jsonl", "a") as fh:
+        for line in record.read_text().splitlines():
+            try:
+                v = json.loads(line)
+                pr = str(v["pr"]).lstrip("#")
+            except (ValueError, KeyError, TypeError):
+                continue
+            cats = [c if c in CATEGORIES else "outro" for c in v.get("categorias") or []]
+            fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": v.get("commit"),
+                                 "veredito": v.get("veredito"), "categorias": cats}, ensure_ascii=False) + "\n")
+    record.unlink()
+
+
 def main():
     if not CLONE:
         sys.exit("REVISOR_CLONE ausente: aponte para o clone do repo dos PRs")
@@ -340,6 +361,9 @@ def main():
               "veredito ✅ e, em uma ou duas linhas, o que o PR corrige — quem aprova e faz o merge é o validador, depois de "
               "provar;" if HANDOFF else "Aprove os que passarem;")
     prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK, passed=passed)
+    record = VERDICTS / f"{out.stem}.jsonl"
+    VERDICTS.mkdir(parents=True, exist_ok=True)
+    prompt += f" Registre o veredito de cada PR revisado em {record} (seção \"Registro do veredito\" da skill)."
     back = [pr for pr in todo if pr in flags]
     manual = [pr for pr in todo if pr in vetted]
     if manual:
@@ -370,6 +394,7 @@ def main():
             warn(f"comando do Claude não encontrado: {CLAUDE[0]}")
             sys.exit(1)
 
+    keep_verdicts(record, out)
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
     after = to_review()
     since = datetime.datetime.now(datetime.timezone.utc).isoformat()
