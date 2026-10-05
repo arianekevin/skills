@@ -164,7 +164,7 @@ Só quando o pedido disser **modo triagem** ou **modo portão**. Há um agente c
 
 ### Modo triagem
 Revise como sempre (Passos 1 a 4). Muda o Passo 5:
-- **✅** → aprova como sempre (com nota de produto: comenta e aprova).
+- **✅** → aprova como sempre (com nota de produto: comenta e aprova). Se o pedido disser que quem aprova é o validador, não toque no Bitbucket: grave o `aprovado.md` indicado, com o que o PR corrige.
 - **❌ ou ⚠️** → **não toque no Bitbucket**: nem comentário, nem request changes. Escreva os achados do PR em `<pasta indicada>/<número do PR>/achados.md`, um arquivo por PR, no formato do Passo 4 (cabeçalho `## <ticket ou título curto> (#<pr>)`).
 - **INCONCLUSIVO** → nada, como sempre.
 

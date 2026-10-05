@@ -398,6 +398,17 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
             time.sleep(2)
         time.sleep(3)
     done = [f"push do commit {commit}"] if commit else []
+    if state == "aprovado" and not quiet and os.environ.get("REVISOR_VALIDADOR") == "1":
+        # com o validador na esteira: nada de comentário nem aprovação agora; o PR vai para a fila dele, e o que
+        # foi corrigido entra no comentário do merge
+        q = DIR / "trabalho" / "validacao-fila" / pr
+        q.mkdir(parents=True, exist_ok=True)
+        (q / "aprovado.md").write_text(f"{title}\n✅ {str((verdict or {}).get('motivo', '')).strip()}\n")
+        if posts:
+            (q / "comentario.md").write_text(posts[0][1])
+        (q / "marca.json").write_text(json.dumps({"commit": commit or head,
+                                                  "desde": datetime.datetime.now(datetime.timezone.utc).isoformat()}))
+        return log(f"#{pr}: aprovado — " + ", ".join(done + ["para o validador, sem aprovação no Bitbucket"]))
     for who, _, path in [] if quiet else posts:  # o comentário antes da marca: a marca do revisor fecha a conversa
         ok, out = write("comment", str(path), fixer=who)
         done.append("comentário do revisor" if ok else f"comentário FALHOU ({out[:120]})")

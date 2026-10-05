@@ -71,13 +71,17 @@ REVIEWER = os.environ.get("REVISOR_REVISOR")
 TRIAGE = bool(os.environ.get("CORRETOR_CLAUDE"))
 WORK = DIR / "trabalho" / "correcao"
 FLAGS = DIR / "trabalho" / "validacao"
+# com o validador na esteira, PR que passa na triagem não é aprovado no Bitbucket: vai para esta fila,
+# e quem aprova e faz o merge é o validador, depois de provar
+HANDOFF = TRIAGE and os.environ.get("REVISOR_VALIDADOR") == "1"
+VQUEUE = DIR / "trabalho" / "validacao-fila"
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
           "Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs} e aplique o "
           "resultado no Bitbucket. Escreva o relatório final em português.")
 PROMPT_TRIAGE = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
                  "Modo triagem. Revise como lista (valem REVISAR/PULAR; nunca use --isolado) os PRs {prs}. "
-                 "Aprove os que passarem; para os que tiverem achado, não escreva no Bitbucket: grave "
+                 "{passed} para os que tiverem achado, não escreva no Bitbucket: grave "
                  "{work}/<número do PR>/achados.md. Baixe os tickets em {work}/issues. "
                  "Escreva o relatório final em português.")
 
@@ -107,8 +111,25 @@ def changed_since(base, pr, since):
     st, d = bitbucket.call("GET", f"{base}/{pr}/activity", params={"pagelen": 1})
     if st != 200 or not d.get("values"):
         return False
+    if "comment" in d["values"][0] and ((d["values"][0]["comment"].get("user") or {}).get("display_name") in bitbucket.SILENT):
+        return False  # o retorno do validador não é novidade para a revisão
     last = next(v for k, v in d["values"][0].items() if isinstance(v, dict) and ("date" in v or "created_on" in v))
     return datetime.datetime.fromisoformat(last.get("date") or last["created_on"]) > datetime.datetime.fromisoformat(since)
+
+
+def in_validation(base, pr, commit):
+    """O PR passou na revisão e está com o validador, no mesmo commit e sem atividade nova desde então?
+    Marca velha (o PR mudou) é arquivada: o PR volta para a revisão."""
+    mark = VQUEUE / pr / "marca.json"
+    if not mark.exists():
+        return False
+    m = json.loads(mark.read_text())
+    if m["commit"][:12] == commit[:12] and not changed_since(base, pr, m["desde"]):
+        return True
+    dest = VQUEUE / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-mudou"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(VQUEUE / pr), str(dest))
+    return False
 
 
 def in_correction(base, pr, commit):
@@ -246,7 +267,8 @@ def main():
              if ((URGENT or ONLY or REDO) and pr not in before)
              or (before.get(pr) == s["commit"] and not changed_since(base, pr, s["desde"]))}
     blocked = [pr for pr in before if state.get(pr, {}).get("tentativas", 0) >= TENTATIVAS]
-    waiting = [pr for pr in before if TRIAGE and pr not in blocked and in_correction(base, pr, before[pr])]
+    waiting = [pr for pr in before if TRIAGE and pr not in blocked and pr not in flags
+               and (in_correction(base, pr, before[pr]) or HANDOFF and in_validation(base, pr, before[pr]))]
     for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
         if not URGENT and hold(pr, conflicts(before[pr]), quiet=pr in flags):
             del before[pr]
@@ -266,7 +288,10 @@ def main():
            if len(before) - len(blocked) - len(waiting) > len(todo) else ""))
     out = DIR / "rodadas" / f"{datetime.datetime.now():%Y%m%d-%H%M}.log"
     started = datetime.datetime.now().timestamp()
-    prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK)
+    passed = (f"Para os que passarem, também não escreva no Bitbucket: grave {VQUEUE}/<número do PR>/aprovado.md com o "
+              "veredito ✅ e, em uma ou duas linhas, o que o PR corrige — quem aprova e faz o merge é o validador, depois de "
+              "provar;" if HANDOFF else "Aprove os que passarem;")
+    prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK, passed=passed)
     back = [pr for pr in todo if pr in flags]
     if forced & set(todo):
         prompt += (f" Os PRs {', '.join('#' + pr for pr in todo if pr in forced)} entram nesta rodada mesmo que a listagem os marque "
@@ -289,12 +314,14 @@ def main():
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
     after = to_review()
     since = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    done = sent = 0
+    done = sent = handed = 0
     for pr in todo:
         found = WORK / pr / "achados.md"
         fresh = TRIAGE and found.exists() and found.stat().st_mtime >= started  # a triagem achou problema
-        # PR forçado pode nunca ter estado no REVISAR (a aprovação de outro usuário continua lá): o achado vale assim mesmo
-        if after.get(pr) != before[pr] and not (fresh and pr in forced and pr not in after):  # saiu do REVISAR, ou recebeu commit durante a rodada
+        verdict = VQUEUE / pr / "aprovado.md"
+        to_validator = HANDOFF and not fresh and verdict.exists() and verdict.stat().st_mtime >= started  # passou
+        # PR forçado pode nunca ter estado no REVISAR (a aprovação de outro usuário continua lá): o veredito vale assim mesmo
+        if after.get(pr) != before[pr] and not ((fresh or to_validator) and pr in forced and pr not in after):  # saiu do REVISAR, ou recebeu commit durante a rodada
             done += pr not in after
             state.pop(pr, None)
             if pr in back and pr not in after:
@@ -307,6 +334,13 @@ def main():
             if pr in back:
                 unflag(pr, "corretor")
             continue
+        if to_validator:  # sem aprovação no Bitbucket: o validador prova, aprova e faz o merge
+            (VQUEUE / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
+            handed += 1
+            state.pop(pr, None)
+            if pr in back:
+                unflag(pr, "revisado")
+            continue
         n = state.get(pr, {}).get("tentativas", 0) + 1
         state[pr] = {"commit": before[pr], "tentativas": n, "desde": since}
         if n >= TENTATIVAS:
@@ -315,6 +349,7 @@ def main():
                  f"Última rodada: {out}")
     STATE.write_text(json.dumps(state, indent=1))
     log(f"fim ({end}): {done} de {len(todo)} saíram do REVISAR" + (f", {sent} para o corretor" if TRIAGE else "")
+        + (f", {handed} para o validador" if HANDOFF else "")
         + f"; saída em {out}")
     wake()
 
