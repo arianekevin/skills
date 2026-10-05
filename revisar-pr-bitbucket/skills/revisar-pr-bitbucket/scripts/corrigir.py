@@ -9,6 +9,8 @@ na fila. Sem argumento ele esvazia a fila, um PR por vez, e sai. Um lock própri
   corrigir.py --pr 123            só este PR (precisa estar na fila)
   corrigir.py --reabrir 123       PR que já recebeu request changes: monta a fila a partir dos
                                   comentários do PR e roda
+  corrigir.py ... --so-resolvido  publica só se o veredito for aprovado; senão o PR fica exatamente
+                                  como estava (sem push, comentário nem marca)
   corrigir.py ... --ensaio        faz as voltas e mostra o que publicaria; não dá push nem escreve
                                   no Bitbucket, e deixa a cópia da branch para conferir
                                   (o PR sai da fila ao fim do ensaio)
@@ -208,13 +210,15 @@ def queue():
 def reopen(base, pr, d):
     """Monta a fila de um PR que já foi comentado: os comentários do PR viram o achados.md."""
     reviewers = {p["user"].get("uuid") for p in d.get("participants", []) if p.get("state")}
+    # pelo nome também: o token do revisor trocado vira outro usuário-bot, com o mesmo nome
+    names = {p["user"].get("display_name") for p in d.get("participants", []) if p.get("state")}
     parts = [f"## {d['title'][:80]} (#{pr})", "",
              "Comentários do PR, do mais antigo para o mais novo. Os do revisor são os achados; os outros são respostas do dev.", ""]
     found = False
     for c in sorted(bitbucket.paginate(f"{base}/{pr}/comments", {"pagelen": 100}), key=lambda c: c["created_on"]):
         if c.get("deleted") or not c["content"]["raw"].strip():
             continue
-        mine = (c.get("user") or {}).get("uuid") in reviewers
+        mine = (c.get("user") or {}).get("uuid") in reviewers or (c.get("user") or {}).get("display_name") in names
         found = found or mine
         parts += [f"**{'Revisor' if mine else 'Dev (' + c['user']['display_name'] + ')'}, {c['created_on'][:10]}:**", "",
                   c["content"]["raw"].strip(), ""]
@@ -257,7 +261,7 @@ def body(work, pr):
     return head, rest.strip()
 
 
-def correct(base, pr, dry):
+def correct(base, pr, dry, only_resolved=False):
     work, tree, issues = WORK / pr, TREES / f"pr-{pr}", WORK / "issues"
     st, d = bitbucket.call("GET", f"{base}/{pr}")
     if st != 200 or d["state"] != "OPEN":
@@ -353,7 +357,7 @@ def correct(base, pr, dry):
             "achado e responda DECISÃO.\n")
 
     publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=bool(mark.get("validador")),
-            unreviewed=bool(mark.get("conflito")), merged=merged, dest=dest)
+            unreviewed=bool(mark.get("conflito")), merged=merged, dest=dest, only_resolved=only_resolved)
     if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade
         (work / "marca.json").rename(work / "marca-ensaio.json")
     else:
@@ -361,12 +365,14 @@ def correct(base, pr, dry):
         archive(work, pr)
 
 
-def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unreviewed=False, merged=None, dest=""):
+def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unreviewed=False, merged=None, dest="", only_resolved=False):
     """`quiet`: o PR veio do validador, que espera o veredito e é quem comenta. Os textos ficam na pasta;
     no PR entram só o push e a marca (aprovação ou request changes).
     `unreviewed`: o PR veio só pelo conflito com o destino, sem revisão; resolvido, sobe só o push e ele volta
     para a revisão. `merged`: o destino foi trazido para a cópia ("limpo" ou "conflito")."""
     state = verdict["estado"] if verdict and verdict["estado"] in ("aprovado", "parcial") else "sem acordo"
+    if only_resolved and state != "aprovado":
+        return log(f"#{pr}: {state}, não resolveu — nada publicado, o PR fica como estava")
     changed = bool(git("status", "--porcelain", cwd=tree)[1]) and state != "sem acordo"
     title, rest = body(work, pr)
     fixed = [str(x).strip() for x in (verdict or {}).get("corrigido", []) if str(x).strip()]
@@ -485,6 +491,7 @@ def main():
     ap.add_argument("--pr")
     ap.add_argument("--reabrir")
     ap.add_argument("--ensaio", action="store_true")
+    ap.add_argument("--so-resolvido", action="store_true")
     a = ap.parse_args()
     if not CLONE:
         sys.exit("REVISOR_CLONE ausente: aponte para o clone do repo dos PRs")
@@ -515,7 +522,7 @@ def main():
     while todo and len(seen) < MAX:  # a fila pode crescer enquanto um PR é corrigido
         pr = todo[0]
         seen.add(pr)
-        correct(base, pr, a.ensaio)
+        correct(base, pr, a.ensaio, a.so_resolvido)
         todo = [] if a.pr or a.reabrir else [p for p in queue() if p not in seen]
 
 
