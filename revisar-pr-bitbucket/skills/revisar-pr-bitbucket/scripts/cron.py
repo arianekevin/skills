@@ -26,8 +26,8 @@ O que faz:
      Bitbucket. Vai para a fila do validador ($REVISOR_DIR/trabalho/validacao-fila/<pr>/) e a rodada o
      chama na hora ($REVISOR_VALIDAR --pr <pr>) e espera: provado, ele aprova, faz o merge e posta o
      comentário final na voz do revisor. O corretor faz o mesmo quando a correção dele é aprovada.
-  3c. PR que o validador devolveu ($REVISOR_DIR/trabalho/validacao/<pr>/: a prova não fechou) entra na
-     rodada seguinte, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
+  3c. PR que o validador devolveu ($REVISOR_DIR/trabalho/validacao/<pr>/: a prova não fechou) é
+     reavaliado em seguida, na mesma execução (--so), ou na rodada seguinte se veio do cron do validador, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
      é o revisor: achado vai ao corretor (ou direto ao dev, se a validação já falhou depois do corretor);
      revisão mantida mesmo com a evidência vira aprovação com nota de merge manual.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
@@ -423,6 +423,9 @@ def main():
     wake()
     for pr in validate:
         validator(pr)
+        if (FLAGS / pr / "marca.json").exists():  # a prova não fechou: reavalia já, com a evidência, sem esperar o cron
+            log(f"#{pr}: o validador devolveu; reavaliando agora com a evidência")
+            subprocess.run([sys.executable, __file__, "--so", pr], cwd=CLONE, stdin=subprocess.DEVNULL)
 
 
 if __name__ == "__main__":
