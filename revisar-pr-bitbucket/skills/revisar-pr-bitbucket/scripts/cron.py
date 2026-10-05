@@ -5,8 +5,7 @@ Uso (crontab, em horário comercial; `flock` impede duas rodadas ao mesmo tempo)
   */30 8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py >> ~/revisor/cron.log 2>&1
   */2  8-19 * * 1-5 . ~/revisor/env && flock -n /tmp/revisor.lock python3 <skill>/scripts/cron.py --urgente >> ~/revisor/cron.log 2>&1
 
-`--so PR` restringe a rodada a um PR: é como o validador aciona o revisor, sem esperar o cron,
-quando a prova de um PR aprovado não fecha (ver 3b).
+`--so PR` restringe a rodada a um PR.
 
 `--rever PR[,PR...]` refaz a revisão desses PRs mesmo que já tenham aprovação (à mão, quando a régua
 mudou). A aprovação de outro usuário não dá para retirar: se a revisão achar problema, o request
@@ -23,11 +22,14 @@ O que faz:
   2. Chama `claude -p` com a skill sobre os PRs a revisar (no máximo $REVISOR_MAX por rodada).
   3. Lista de novo. PR que entrou na rodada e continua REVISAR no mesmo commit ficou sem veredito
      (inconclusivo, erro ao aplicar, rodada cortada): conta uma tentativa.
-  3b. Com --so: se o validador deixou evidência para o PR ($REVISOR_DIR/trabalho/validacao/<pr>/ com
-     evidencia.md e marca.json — a prova, feita depois da aprovação, não fechou), a aprovação do
-     próprio revisor é retirada e a evidência entra no pedido. Essa rodada é calada: o revisor (e o
-     corretor, se for acionado) só marca aprovação ou request changes e dá push; quem comenta no PR
-     é o validador, que acionou a rodada e está esperando o veredito.
+  3b. Com o validador na esteira (REVISOR_VALIDADOR=1, em triagem): PR que passa não é aprovado no
+     Bitbucket. Vai para a fila do validador ($REVISOR_DIR/trabalho/validacao-fila/<pr>/) e a rodada o
+     chama na hora ($REVISOR_VALIDAR --pr <pr>) e espera: provado, ele aprova, faz o merge e posta o
+     comentário final na voz do revisor. O corretor faz o mesmo quando a correção dele é aprovada.
+  3c. PR que o validador devolveu ($REVISOR_DIR/trabalho/validacao/<pr>/: a prova não fechou) entra na
+     rodada seguinte, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
+     é o revisor: achado vai ao corretor (ou direto ao dev, se a validação já falhou depois do corretor);
+     revisão mantida mesmo com a evidência vira aprovação com nota de merge manual.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
      no PR depois da última tentativa zera a contagem: commit, comentário, mudança de estado
      (saiu do draft, marca removida, título ou descrição editados).
@@ -147,6 +149,19 @@ def in_correction(base, pr, commit):
     return False
 
 
+def validator(pr):
+    """Chama o validador neste PR e espera (a rodada segura o lock do revisor enquanto isso). Sem o comando
+    configurado, o PR fica na fila e o cron do validador o encontra."""
+    cmd = os.environ.get("REVISOR_VALIDAR")
+    if not cmd:
+        return log(f"#{pr}: na fila do validador (REVISOR_VALIDAR ausente: fica para o cron dele)")
+    log(f"#{pr}: validador chamado; aguardando")
+    subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} >> \"$HOME/testador/cron.log\" 2>&1"],
+                   cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
+    log(f"#{pr}: validador terminou: " + subprocess.run(["bash", "-c", f"grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200"],
+                                                        capture_output=True, text=True).stdout.strip())
+
+
 def wake():
     """Gatilho do corretor: com PR na fila e nenhum corretor rodando, sobe um, solto desta rodada.
     Se já há um rodando, ele mesmo esvazia a fila."""
@@ -172,7 +187,9 @@ def flagged(base, before):
     """O PR da rodada (--so), se o validador deixou evidência para o commit em que ele está: entra em
     `before`, sem a aprovação do próprio revisor (a de outra pessoa não dá para retirar; entra assim mesmo)."""
     found = []
-    for d in [FLAGS / ONLY] if (FLAGS / ONLY).is_dir() else []:
+    for d in sorted(FLAGS.iterdir()) if FLAGS.is_dir() else []:
+        if ONLY and d.name != ONLY:
+            continue
         if not (d.name.isdigit() and (d / "marca.json").exists() and (d / "evidencia.md").exists()):
             continue
         st, info = bitbucket.call("GET", f"{base}/{d.name}", params={"fields": "state,source.commit.hash"})
@@ -251,7 +268,7 @@ def main():
 
     before = to_review()
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
-    flags = flagged(base, before) if ONLY else []
+    flags = [] if URGENT else flagged(base, before)
     if ONLY:
         before = {pr: commit for pr, commit in before.items() if pr == ONLY}
     for pr in REDO:
@@ -270,7 +287,7 @@ def main():
     waiting = [pr for pr in before if TRIAGE and pr not in blocked and pr not in flags
                and (in_correction(base, pr, before[pr]) or HANDOFF and in_validation(base, pr, before[pr]))]
     for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
-        if not URGENT and hold(pr, conflicts(before[pr]), quiet=pr in flags):
+        if not URGENT and hold(pr, conflicts(before[pr])):
             del before[pr]
             if pr in flags:
                 unflag(pr, "conflito")
@@ -293,13 +310,19 @@ def main():
               "provar;" if HANDOFF else "Aprove os que passarem;")
     prompt = (PROMPT_TRIAGE if TRIAGE else PROMPT).format(prs=", ".join("#" + pr for pr in todo), work=WORK, passed=passed)
     back = [pr for pr in todo if pr in flags]
+    again = []
     if forced & set(todo):
         prompt += (f" Os PRs {', '.join('#' + pr for pr in todo if pr in forced)} entram nesta rodada mesmo que a listagem os marque "
                    "PULAR por aprovação: a aprovação está sendo refeita. Revise-os do zero, pela régua atual.")
     if back:
-        prompt += (f" Atenção a {', '.join('#' + pr for pr in back)}: já tinha a sua aprovação, mas o validador rodou a prova "
-                   f"depois dela e não fechou. A evidência está em {FLAGS}/<número do PR>/evidencia.md: leia antes de julgar, "
-                   "porque ela mostra o que a aprovação não viu.")
+        prompt += (f" Atenção a {', '.join('#' + pr for pr in back)}: já tinha passado na sua revisão, mas o validador rodou a "
+                   f"prova depois e ela não fechou. A evidência está em {FLAGS}/<número do PR>/evidencia.md: leia antes de julgar, "
+                   "porque ela mostra o que a revisão não viu.")
+        again = [pr for pr in back if json.loads((FLAGS / pr / "marca.json").read_text()).get("falhas", 1) >= 2]
+        if again:
+            prompt += (f" Em {', '.join('#' + pr for pr in again)} a validação já falhou mais de uma vez, inclusive depois do "
+                       "corretor: se houver achado, não mande ao corretor — escreva o achado para o dev (no achados.md, como "
+                       "sempre) dizendo que a correção automática já foi tentada.")
     with open(out, "w") as fh:
         try:
             r = subprocess.run([*CLAUDE, "-p", prompt], cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT,
@@ -315,6 +338,7 @@ def main():
     after = to_review()
     since = datetime.datetime.now(datetime.timezone.utc).isoformat()
     done = sent = handed = 0
+    validate = []
     for pr in todo:
         found = WORK / pr / "achados.md"
         fresh = TRIAGE and found.exists() and found.stat().st_mtime >= started  # a triagem achou problema
@@ -327,19 +351,39 @@ def main():
             if pr in back and pr not in after:
                 unflag(pr, "revisado")
             continue
+        if fresh and pr in again:  # a correção automática já foi tentada: o achado vai direto ao dev
+            for cmd, arg in (("comment", str(found)), ("request-changes", pr)):
+                r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, arg, "--isolado"], cwd=CLONE, capture_output=True, text=True)
+                if not r.stdout.strip().endswith("ok"):
+                    log(f"#{pr}: {cmd} FALHOU ({(r.stdout + r.stderr).strip()[:160]})")
+            log(f"#{pr}: validação falhou de novo depois do corretor; achado e request changes direto para o dev")
+            (WORK / "feitos").mkdir(parents=True, exist_ok=True)
+            shutil.move(str(WORK / pr), str(WORK / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-dev"))
+            unflag(pr, "dev")
+            state.pop(pr, None)
+            continue
         if fresh:  # vai ao corretor
-            (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since, "validador": pr in back}))
+            (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
             sent += 1
             state.pop(pr, None)
             if pr in back:
                 unflag(pr, "corretor")
             continue
+        if to_validator and pr in back:  # passou de novo, mesmo com a evidência: aprova, e o merge fica com uma pessoa
+            for cmd, arg in (("comment", str(FLAGS / pr / "nota.md")), ("approve", pr)):
+                r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, arg, "--isolado"], cwd=CLONE, capture_output=True, text=True)
+                if not r.stdout.strip().endswith("ok"):
+                    log(f"#{pr}: {cmd} FALHOU ({(r.stdout + r.stderr).strip()[:160]})")
+            log(f"#{pr}: revisão mantida mesmo com a evidência do validador; aprovado, com nota de merge manual")
+            shutil.rmtree(VQUEUE / pr, ignore_errors=True)
+            unflag(pr, "mantido")
+            state.pop(pr, None)
+            continue
         if to_validator:  # sem aprovação no Bitbucket: o validador prova, aprova e faz o merge
             (VQUEUE / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
             handed += 1
+            validate.append(pr)
             state.pop(pr, None)
-            if pr in back:
-                unflag(pr, "revisado")
             continue
         n = state.get(pr, {}).get("tentativas", 0) + 1
         state[pr] = {"commit": before[pr], "tentativas": n, "desde": since}
@@ -352,6 +396,8 @@ def main():
         + (f", {handed} para o validador" if HANDOFF else "")
         + f"; saída em {out}")
     wake()
+    for pr in validate:
+        validator(pr)
 
 
 if __name__ == "__main__":

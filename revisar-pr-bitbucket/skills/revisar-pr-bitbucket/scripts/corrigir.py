@@ -408,7 +408,13 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
             (q / "comentario.md").write_text(posts[0][1])
         (q / "marca.json").write_text(json.dumps({"commit": commit or head,
                                                   "desde": datetime.datetime.now(datetime.timezone.utc).isoformat()}))
-        return log(f"#{pr}: aprovado — " + ", ".join(done + ["para o validador, sem aprovação no Bitbucket"]))
+        log(f"#{pr}: aprovado — " + ", ".join(done + ["para o validador, sem aprovação no Bitbucket"]))
+        cmd = os.environ.get("REVISOR_VALIDAR")
+        if cmd:  # o validador prova agora; o corretor espera, como a rodada do revisor espera
+            subprocess.run(["flock", "/tmp/testador.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} >> \"$HOME/testador/cron.log\" 2>&1"],
+                           cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
+            log(f"#{pr}: validador terminou")
+        return
     for who, _, path in [] if quiet else posts:  # o comentário antes da marca: a marca do revisor fecha a conversa
         ok, out = write("comment", str(path), fixer=who)
         done.append("comentário do revisor" if ok else f"comentário FALHOU ({out[:120]})")
