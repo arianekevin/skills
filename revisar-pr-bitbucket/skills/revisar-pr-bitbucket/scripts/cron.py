@@ -388,6 +388,7 @@ def main():
             state.pop(pr, None)
             continue
         if fresh:  # vai ao corretor
+            shutil.rmtree(VQUEUE / pr, ignore_errors=True)  # aprovação de uma rodada anterior não vale mais
             (WORK / pr / "marca.json").write_text(json.dumps({"commit": before[pr], "desde": since}))
             sent += 1
             state.pop(pr, None)
