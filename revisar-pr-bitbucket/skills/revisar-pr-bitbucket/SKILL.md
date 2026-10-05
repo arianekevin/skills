@@ -186,6 +186,7 @@ Confira achado por achado, pela resposta dele:
 - **CORRIGIDO:** leia a mudança no código, não só a descrição. Resolve o achado em todos os caminhos? A mudança quebra algo ou abre brecha (método do Passo 2)?
 - **Teste alterado pelo corretor:** só passa se o teste afirmava exatamente o comportamento que o ticket manda mudar e a asserção nova é a do ticket. Teste apagado, afrouxado ou ignorado, ou asserção trocada sobre outro comportamento, reprova: o que quebrou ali é efeito colateral da mudança.
 - **DISCORDO:** confira a evidência no código. Procede: o achado cai. Não procede: responda em cima do argumento, com `arquivo:linha`.
+- **Conflito com o destino resolvido pelo corretor** (o pedido diz quando o destino foi trazido e o merge parou em conflito): cada arquivo mantém o que o PR faz e o que entrou no destino? Lado descartado sem dizer por quê, ou marcador de conflito sobrando, reprova.
 - **DECISÃO:** é mesmo uma escolha que ninguém fez? Se o ticket ou o código já respondem, diga onde; o achado volta para ele corrigir.
 
 A mudança do corretor passa pela mesma régua de "O que é achado": não reprove por estilo, preferência ou preciosismo. Se ele diz que não conseguiu compilar ou testar, isso por si só não reprova; pese o risco da mudança.

@@ -15,7 +15,10 @@ na fila. Sem argumento ele esvazia a fila, um PR por vez, e sai. Um lock própri
 
 O que faz, por PR na fila ($REVISOR_DIR/trabalho/correcao/<pr>/ com achados.md e marca.json,
 deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
-  1. Cria uma cópia da branch (git worktree) em $CORRETOR_DIR/pr-<pr>.
+  1. Cria uma cópia da branch (git worktree) em $CORRETOR_DIR/pr-<pr>. Se a branch está atrás do
+     destino, traz o destino para ela (merge, sem force-push depois): sem conflito, o merge já sai
+     commitado; com conflito, resolver é trabalho do corretor, conferido pelo revisor. O merge só sobe
+     junto com outra mudança ou com o conflito resolvido.
   2. Até $CORRETOR_VOLTAS voltas: o corretor (skill corrigir-pr) mexe na cópia e responde achado
      por achado; o revisor, em modo portão, confere a mudança e a resposta e dá o veredito.
   3. Publica conforme o veredito. Quem comenta é sempre o revisor, num comentário só; o corretor só dá push:
@@ -24,7 +27,8 @@ deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
      parcial   commit + push + comentário (o corrigido e o que ficou para o dev) + request changes
      sem acordo ao fim das voltas: descarta a mudança; comentário com os achados + request changes
   O commit vai em cima da branch, sem force-push. Se a branch andou no meio, nada é publicado e o
-  PR volta para a triagem.
+  PR volta para a triagem. PR que veio só pelo conflito com o destino (a triagem não o revisou) e
+  foi resolvido: só o push, sem marca nem comentário; com o commit novo ele volta para a revisão.
 
 Ambiente (além do que cron.py já usa):
   CORRETOR_CLAUDE     comando do Claude Code do corretor, com as permissões dele (obrigatório)
@@ -38,7 +42,7 @@ Ambiente (além do que cron.py já usa):
                       os testes que falharam; saída diferente de 0 = a suíte não rodou (não compilou).
                       Com ele, depois que o revisor aceita a mudança, a suíte roda onde o PR vai parar:
                       o destino atual com a branch e a mudança por cima, comparado com o destino sozinho
-                      (se a branch conflita com o destino, a comparação é na própria branch).
+                      (com o destino já trazido para a branch, a comparação é na própria cópia).
                       Teste que passa sem o PR e falha com ele volta para o corretor como achado
                       (ele arruma o teste, se o teste fixava o comportamento que o ticket muda, ou
                       conserta a mudança), e sem resolver nada é publicado. Teste que já falhava no
@@ -73,10 +77,10 @@ SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|BITBUCKET_|YOUTRACK_|TEAMCITY_")
 
 HEAD = "Rodada automática, sem ninguém acompanhando: não pergunte nada. "
 ASK_FIX = ("/revisar-pr-bitbucket:corrigir-pr " + HEAD + "PR #{pr} ({branch} -> {dest}), volta {v} de {n}. O diretório atual é a sua "
-           "cópia da branch. Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{context}{verify} Escreva "
+           "cópia da branch.{merged} Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{context}{verify} Escreva "
            "{work}/resposta.md e, se mudar código, {work}/commit.txt. Responda em português.")
 ASK_GATE = ("/revisar-pr-bitbucket " + HEAD + "Modo portão, PR #{pr} ({branch} -> {dest}), volta {v} de {n}{last}. "
-            "O diretório atual é a cópia da branch com a mudança do corretor sem commit. Pasta: {work} "
+            "O diretório atual é a cópia da branch com a mudança do corretor sem commit.{merged_gate} Pasta: {work} "
             "(achados.md e resposta.md). Tickets (JSON): {issues}.{context} Entregue {work}/veredito.json e regrave "
             "{work}/achados.md. Responda em português.")
 
@@ -123,6 +127,22 @@ def scratch(name, ref):
     return path if git("worktree", "add", "--detach", str(path), ref)[0] == 0 else None
 
 
+def bring(tree, dest):
+    """Traz o destino para a cópia da branch, se ela está atrás: "limpo" (merge commitado), "conflito"
+    (merge parado, para o corretor resolver) ou None (não estava atrás, ou não deu para tentar)."""
+    name, email = os.environ.get("CORRETOR_GIT_NAME"), os.environ.get("CORRETOR_GIT_EMAIL")
+    if not (name and email) or git("rev-list", "--count", f"HEAD..origin/{dest}", cwd=tree)[1] in ("", "0"):
+        return None
+    rc, _ = git("-c", f"user.name={name}", "-c", f"user.email={email}", "merge", "--no-edit", "-q",
+                "-m", f"Merge da {dest} na branch do PR", f"origin/{dest}", cwd=tree)
+    if rc == 0:
+        return "limpo"
+    if git("rev-parse", "-q", "--verify", "MERGE_HEAD", cwd=tree)[0] == 0 and git("diff", "--name-only", "--diff-filter=U", cwd=tree)[1]:
+        return "conflito"
+    git("merge", "--abort", cwd=tree)
+    return None
+
+
 def baseline(ref, logs):
     """Testes que já falham em `ref`. Guardado por commit: enquanto o destino não anda, não roda de novo."""
     cache = TREES / f"suite-{git('rev-parse', '--short=12', ref)[1]}.txt"
@@ -136,32 +156,42 @@ def baseline(ref, logs):
     return found
 
 
-def broken(pr, tree, branch, dest, hist):
+def broken(pr, tree, branch, dest, hist, merged=None):
     """Testes que o PR, com a mudança do corretor, quebra: (lista, onde foi medido). Lista vazia: nada quebrou.
     Mede onde o PR vai parar: o destino atual, com a branch e a mudança por cima, contra o destino sozinho.
-    Se a branch conflita com o destino, mede na própria branch. None: não deu para comparar.
+    Com o destino já trazido para a cópia (`merged`), mede nela mesma. Se não deu para montar, mede na
+    própria branch. None: não deu para comparar.
     Só conta o que falha em duas rodadas seguidas (teste instável não segura a correção)."""
+    if merged:  # a cópia já é o destino com a branch por cima; sem add/reset, que desfariam um merge em conflito
+        stage, where, ref = tree, f"em cima da {dest} atual (trazida para a branch)", f"origin/{dest}"
+        return measure(stage, tree, ref, hist), where
     git("add", "-A", cwd=tree)
     patch = hist / "mudanca.patch"
     patch.write_text(git("diff", "--cached", "--binary", "HEAD", cwd=tree)[1] + "\n")
     git("reset", "-q", cwd=tree)  # a mudança continua sem commit e fora do índice, como o revisor espera ver
     stage, where, ref = scratch(f"pr-{pr}-{dest}", f"origin/{dest}"), f"em cima da {dest} atual", f"origin/{dest}"
-    if not (stage and git("merge", "--no-commit", "--no-ff", f"origin/{branch}", cwd=stage)[0] == 0
-            and git("apply", "--index", str(patch), cwd=stage)[0] == 0):
+    why = ("não criei a cópia" if not stage else "a branch conflita com ela" if git("merge", "--no-commit", "--no-ff", f"origin/{branch}", cwd=stage)[0]
+           else "a mudança não aplicou em cima dela" if git("apply", "--index", str(patch), cwd=stage)[0] else "")
+    if why:
         git("worktree", "remove", "--force", str(TREES / f"pr-{pr}-{dest}"))
-        stage, where, ref = tree, f"na própria branch, porque ela conflita com a {dest}", f"origin/{branch}"
+        stage, where, ref = tree, f"na própria branch, sem a {dest} ({why})", f"origin/{branch}"
+    return measure(stage, tree, ref, hist), where
+
+
+def measure(stage, tree, ref, hist):
+    """Testes que falham em `stage` e passam em `ref`, em duas rodadas seguidas. None: a base não rodou."""
     try:
         base = baseline(ref, hist)
         if base is None:
-            return None, where
+            return None
         after = suite(stage, hist / "suite-depois.log")
         if after is None:
-            return ["a suíte não rodou com a mudança (não compila?)"], where
+            return ["a suíte não rodou com a mudança (não compila?)"]
         new = after - base
         if new:
             again = suite(stage, hist / "suite-depois-2.log")
             new &= again if again is not None else new
-        return sorted(new), where
+        return sorted(new)
     finally:
         if stage != tree:
             git("worktree", "remove", "--force", str(stage))
@@ -250,14 +280,23 @@ def correct(base, pr, dry):
     if rc != 0:
         log(f"#{pr}: não consegui criar a cópia da branch: {out[:200]}")
         return
-    log(f"#{pr}: correção{' (ensaio)' if dry else ''}, {branch} em {head}")
+    merged = bring(tree, dest)
+    log(f"#{pr}: correção{' (ensaio)' if dry else ''}, {branch} em {head}"
+        + {"limpo": f", com a {dest} trazida (sem conflito)", "conflito": f", com a {dest} trazida (em conflito)"}.get(merged, ""))
 
     safe = {k: v for k, v in os.environ.items() if not SECRET.search(k) or k == "CLAUDE_CODE_OAUTH_TOKEN"}
     # o caminho vai no pedido: deixado por conta da skill, o contexto do projeto não era lido nestas sessões
     ctx = pathlib.Path("~/.claude/revisar-pr-bitbucket/contexto").expanduser() / f"{bitbucket.resolve_repo(None).split('/')[-1]}.md"
     fmt = dict(pr=pr, branch=branch, dest=dest, n=VOLTAS, work=work, issues=issues,
                context=f" Antes de tudo, leia o contexto do projeto: {ctx}." if ctx.exists() else "",
-               verify=f" Para verificar, rode na cópia: {VERIFY}" if VERIFY else "")
+               verify=f" Para verificar, rode na cópia: {VERIFY}" if VERIFY else "",
+               merged={"limpo": f" A {dest} atual já foi trazida para ela (merge sem conflito, commitado): o diff é só o que você mudar.",
+                       "conflito": f" A {dest} atual foi trazida para ela e o merge parou em conflito (`git status` mostra os arquivos): "
+                                   "resolver é parte do trabalho; não rode `git commit` nem `git merge --abort`."}.get(merged, ""),
+               merged_gate={"limpo": f" A {dest} foi trazida antes (merge sem conflito, commitado): `git diff` é só a mudança do corretor.",
+                            "conflito": f" A {dest} foi trazida antes e o merge parou em conflito: a resolução do corretor está na cópia "
+                                        "sem commit (`git diff` mostra o diff combinado); confira que ela mantém o PR e a "
+                                        f"{dest}."}.get(merged, ""))
     verdict, fresh = None, False  # fresh: o achados.md é texto do revisor, já discutido com o corretor
     for v in range(1, VOLTAS + 1):
         stamp = f"{datetime.datetime.now():%Y%m%d-%H%M}"
@@ -291,7 +330,7 @@ def correct(base, pr, dry):
         log(f"#{pr}: volta {v}, {verdict['estado']}: {str(verdict.get('motivo', ''))[:160]}")
         if verdict["estado"] not in ("aprovado", "parcial"):
             continue
-        broke, where = broken(pr, tree, branch, dest, hist) if SUITE and git("status", "--porcelain", cwd=tree)[1] else ([], "")
+        broke, where = broken(pr, tree, branch, dest, hist, merged) if SUITE and git("status", "--porcelain", cwd=tree)[1] else ([], "")
         if broke is None:
             log(f"#{pr}: volta {v}, suíte sem comparação ({where}): a base não rodou")
         elif where:
@@ -313,7 +352,8 @@ def correct(base, pr, dry):
             "mudança tem efeito colateral: conserte a mudança. Se não dá para dizer pelo ticket, desfaça a mudança daquele "
             "achado e responda DECISÃO.\n")
 
-    publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=bool(mark.get("validador")))
+    publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=bool(mark.get("validador")),
+            unreviewed=bool(mark.get("conflito")), merged=merged, dest=dest)
     if dry:  # ensaio não fica na fila: senão o próximo gatilho publicaria de verdade
         (work / "marca.json").rename(work / "marca-ensaio.json")
     else:
@@ -321,9 +361,11 @@ def correct(base, pr, dry):
         archive(work, pr)
 
 
-def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
+def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unreviewed=False, merged=None, dest=""):
     """`quiet`: o PR veio do validador, que espera o veredito e é quem comenta. Os textos ficam na pasta;
-    no PR entram só o push e a marca (aprovação ou request changes)."""
+    no PR entram só o push e a marca (aprovação ou request changes).
+    `unreviewed`: o PR veio só pelo conflito com o destino, sem revisão; resolvido, sobe só o push e ele volta
+    para a revisão. `merged`: o destino foi trazido para a cópia ("limpo" ou "conflito")."""
     state = verdict["estado"] if verdict and verdict["estado"] in ("aprovado", "parcial") else "sem acordo"
     changed = bool(git("status", "--porcelain", cwd=tree)[1]) and state != "sem acordo"
     title, rest = body(work, pr)
@@ -337,8 +379,13 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
             return
         msg = work / "commit.txt"
         if not msg.exists() or not msg.read_text().strip():
-            msg.write_text(f"fix: correções da revisão do PR #{pr}\n")
+            msg.write_text(f"Merge da {dest} na {branch}, com o conflito resolvido\n" if merged == "conflito"
+                           else f"fix: correções da revisão do PR #{pr}\n")
         git("add", "-A", cwd=tree)
+        if merged == "conflito" and "conflict marker" in subprocess.run(["git", "diff", "--cached", "--check", "HEAD"], cwd=tree,
+                                                                          capture_output=True, text=True).stdout:
+            log(f"#{pr}: a resolução do conflito ainda tem marcador de conflito; nada publicado")
+            return
         rc, out = git("-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-q", "-F", str(msg), cwd=tree)
         if rc != 0:
             log(f"#{pr}: commit falhou, nada publicado: {out[:200]}")
@@ -398,6 +445,9 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False):
             time.sleep(2)
         time.sleep(3)
     done = [f"push do commit {commit}"] if commit else []
+    if unreviewed and state == "aprovado":
+        log(f"#{pr}: conflito resolvido — " + ", ".join(done + ["sem marca nem comentário; com o commit novo, volta para a revisão"]))
+        return
     if state == "aprovado" and not quiet and os.environ.get("REVISOR_VALIDADOR") == "1":
         # com o validador na esteira: nada de comentário nem aprovação agora; o PR vai para a fila dele, e o que
         # foi corrigido entra no comentário do merge

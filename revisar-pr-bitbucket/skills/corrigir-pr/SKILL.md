@@ -53,6 +53,12 @@ Um teste que passava e passa a falhar com a sua mudança tem três leituras. Des
 
 Na `resposta.md`, todo teste alterado é dito: qual teste, o que ele afirmava, o que passou a afirmar e o trecho do ticket que decide.
 
+## Branch atrás do destino
+
+Quem chamou já trouxe o destino para a cópia (o pedido diz). Sem conflito, o merge está commitado e você trabalha por cima, como em qualquer cópia: o que só existe no destino (teste novo, classe que mudou) já está aqui para você ajustar.
+
+Com conflito, o merge está parado e resolver é um achado como os outros. Para cada arquivo em conflito (`git status`): leia os dois lados e o que cada um quis fazer (`git log` do destino e do PR naquele arquivo) e mantenha os dois. Conflito mecânico (import, linha vizinha, assinatura que mudou, arquivo movido) é CORRIGIDO. Se as duas mudanças disputam a mesma regra e manter as duas não faz sentido, é DECISÃO: diga o que cada lado quer e deixe o arquivo como estava no conflito. Nunca rode `git commit` nem `git merge --abort`, e não deixe marcador de conflito (`<<<<<<<`) em arquivo nenhum.
+
 ## Verificar antes de responder
 
 Compile e rode os testes do jeito que o contexto do projeto ou o `CLAUDE.md` do repo mandar. Se houver um comando de verificação indicado no pedido, use esse.

@@ -17,8 +17,10 @@ sem fetch, sem chamar o Claude e sem escrever no log.
 
 O que faz:
   1. `git fetch` no clone e `bitbucket.py list --dest <destino>`. Sem PR marcado REVISAR, sai sem
-     chamar o Claude. PR a revisar que conflita com o destino atual não é revisado: recebe request
-     changes pedindo a atualização da branch (o código que vai entrar ainda não existe).
+     chamar o Claude. PR a revisar que conflita com o destino atual não é revisado (o código que vai
+     entrar ainda não existe): com o corretor na esteira, vai à fila dele, que traz o destino para a
+     branch e resolve o conflito (o que exige decisão volta ao dev pelo revisor); sem corretor, recebe
+     request changes pedindo a atualização da branch.
   2. Chama `claude -p` com a skill sobre os PRs a revisar (no máximo $REVISOR_MAX por rodada).
   3. Lista de novo. PR que entrou na rodada e continua REVISAR no mesmo commit ficou sem veredito
      (inconclusivo, erro ao aplicar, rodada cortada): conta uma tentativa.
@@ -229,11 +231,22 @@ def conflicts(commit):
     return r.stdout.splitlines()[1:] if r.returncode == 1 else []
 
 
-def hold(pr, files, quiet=False):
-    """PR em conflito com o destino: comentário + request changes, sem chamar o Claude. Devolve se segurou.
+def hold(pr, files, commit, quiet=False):
+    """PR em conflito com o destino, sem chamar o Claude. Devolve se segurou. Com o corretor na esteira,
+    o conflito vai à fila dele como achado; sem ele, comentário + request changes.
     `quiet`: só o request changes (rodada acionada pelo validador, que é quem comenta)."""
     if not files:
         return False
+    if TRIAGE:
+        (WORK / pr).mkdir(parents=True, exist_ok=True)
+        (WORK / pr / "achados.md").write_text(
+            f"## PR (#{pr})\n❌ **O PR conflita com a `{DEST}` atual.** O conflito está em:\n" + "\n".join(f"- `{f}`" for f in files)
+            + f"\n\nA `{DEST}` já foi trazida para a sua cópia e o merge parou no conflito. Resolva mantendo o que o PR faz "
+            f"e o que entrou na `{DEST}`. Se as duas mudanças disputam a mesma regra e não dá para manter as duas, é DECISÃO.\n")
+        (WORK / pr / "marca.json").write_text(json.dumps({"commit": commit, "conflito": True,
+                                                          "desde": datetime.datetime.now(datetime.timezone.utc).isoformat()}))
+        log(f"#{pr}: conflita com a {DEST} ({len(files)} arquivo(s)); para o corretor resolver")
+        return True
     text = DIR / "rodadas" / f"conflito-{pr}.md"
     text.write_text(f"## PR (#{pr})\n⚠️ **O PR conflita com a `{DEST}` atual; não revisei.** O conflito está em:\n"
                     + "\n".join(f"- `{f}`" for f in files)
@@ -305,7 +318,7 @@ def main():
     waiting = [pr for pr in before if TRIAGE and pr not in blocked and pr not in flags and pr not in vetted
                and (in_correction(base, pr, before[pr]) or HANDOFF and in_validation(base, pr, before[pr]))]
     for pr in [pr for pr in before if pr not in blocked and pr not in waiting]:
-        if not URGENT and hold(pr, conflicts(before[pr])):
+        if not URGENT and hold(pr, conflicts(before[pr]), before[pr]):
             del before[pr]
             if pr in flags:
                 unflag(pr, "conflito")
