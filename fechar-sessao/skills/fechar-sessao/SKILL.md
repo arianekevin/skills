@@ -52,25 +52,48 @@ Regras:
 
 Doc por tarefa: atualize `atualizado:` e o `escopo:` se cresceu. Doc do repo: siga o formato dele.
 
-## Passo 4 — Commitar ou manter local: a pessoa decide
+**Doc sem nada a fazer** — próximo passo cumprido, nenhum adiado esperando gatilho, nenhuma pergunta
+aberta: a tarefa acabou. Não feche a sessão nele; siga a `finalizar-tarefa`, que pede o sim e apaga.
 
-**Por padrão o doc não é commitado.** Depois de escrever, pergunte uma vez: commitar ou manter local?
-Se já houver outra pergunta a fazer (passo 1), junte as duas numa chamada só.
+## Passo 4 — Local ou junto do projeto: escolhido uma vez por repo
 
-- Doc de continuidade do repo cujo CLAUDE.md manda atualizar "no mesmo commit": pergunte do mesmo
-  jeito, mas diga na pergunta que a regra do repo espera o commit.
-- **Commitar:** commit só com o doc (e nada mais), na convenção de mensagem do repo. Sem convenção:
-  `docs(pendencias): <tarefa> — onde paramos em AAAA-MM-DD`. Push só se o repo tiver autorização
-  registrada (memória ou CLAUDE.md); senão, o push fica em "Onde paramos" esperando o ok.
-- **Manter local:** não faça `git add`. Diga que o arquivo aparece como não rastreado (ou modificado)
-  no `git status` e que só existe nesta máquina.
+A escolha fica guardada no próprio repo, só nesta máquina:
+```bash
+git config --local --get pendencias.modo    # local | compartilhado | (vazio)
+```
+
+**Vazio — primeira sessão fechada neste repo:** pergunte uma vez, com as duas opções:
+- **Local** — o doc é trabalho entre sessões de quem está na máquina; nunca vai para commit nem push.
+- **Junto do projeto** — o doc é commitado e sobe com o resto do trabalho.
+
+Grave a resposta (`git config --local pendencias.modo local|compartilhado`) e diga que dá para mudar
+pedindo. Daí em diante, siga o modo gravado sem perguntar.
+
+**Modo `local`:**
+- Se `docs/pendencias/` não estiver em `.git/info/exclude`, acrescente a linha — ignore só desta
+  máquina, para o doc não entrar num commit por engano. Não mexa no `.gitignore`, que é compartilhado.
+- Doc já rastreado pelo git: não o tire do índice por conta própria. Avise uma vez que ele está
+  versionado e que `git rm --cached <doc>` o torna local.
+
+**Modo `compartilhado`:**
+- Tire `docs/pendencias/` do `.git/info/exclude`, se estiver lá.
+- Commit só com o doc (e nada mais), na convenção de mensagem do repo. Sem convenção:
+  `docs(pendencias): <tarefa> — onde paramos em AAAA-MM-DD`.
+- Push: se o repo tem autorização registrada (memória ou CLAUDE.md), suba; senão, o commit sobe no
+  próximo push do projeto — não peça push só por causa do doc.
+
+**Pedido explícito diferente** ("esse não commita", "dessa vez sobe"): vale só para esta vez. Muda o
+modo gravado apenas se a pessoa disser que é dali em diante.
+
+**Doc de continuidade do repo** (o CLAUDE.md manda manter): não pergunte nem grave modo — a regra do
+repo decide, e push só com autorização registrada.
 
 Mudanças de código não commitadas: **nunca** as inclua. Registre-as em "Estado do ambiente" e avise.
 
 ## Passo 5 — Fechar a conversa
 
 Três linhas, no máximo:
-- o caminho do doc (criado ou atualizado; commitado ou local);
+- o caminho do doc (criado ou atualizado);
 - o primeiro passo ao retomar;
 - o que ficou pendente da pessoa (push, decisão), se houver.
 
@@ -80,5 +103,5 @@ Três linhas, no máximo:
 - Não resumir a conversa inteira: o doc é para retomar, não para contar.
 - Não apagar nada — remover o doc é da `finalizar-tarefa`.
 - Não perguntar o que dá para medir (`git`, arquivos). Perguntar só a ambiguidade do passo 1 e o
-  commit-ou-local do passo 4 — juntas, quando houver as duas.
-- Não commitar o doc sem o sim da pessoa.
+  modo do passo 4 na primeira vez do repo — juntas, quando houver as duas.
+- Não contrariar o modo gravado sem pedido explícito.

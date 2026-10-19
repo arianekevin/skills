@@ -1,6 +1,6 @@
 ---
 name: finalizar-tarefa
-description: Encerra uma tarefa de vez — lê o doc de pendências dela, aponta o que ainda está aberto (próximo passo, adiados, código não commitado ou não empurrado), confirma com a pessoa e, confirmado, remove o doc num commit dizendo que a tarefa foi finalizada. Use quando a pessoa disser "vamos finalizar essa tarefa", "tarefa concluída", "pode encerrar a tarefa X", "terminamos isso" ou similar. NÃO use para pausar e retomar depois ("fechar a sessão") — isso é a skill fechar-sessao.
+description: Encerra uma tarefa de vez — lê o doc de pendências dela, aponta o que ainda está aberto (próximo passo, adiados, código não commitado ou não empurrado), confirma com a pessoa e, confirmado, apaga o doc — com commit ou só no disco, conforme o modo do repo. Use quando a pessoa disser "vamos finalizar essa tarefa", "tarefa concluída", "pode encerrar a tarefa X", "terminamos isso" ou similar; quando perguntar se acabou ("fizemos tudo?", "falta alguma coisa?", "acabou?", "terminou?") e existir um doc em docs/pendencias/; ou quando o trabalho da sessão cumprir o último item a fazer de um doc de pendências. NÃO use para pausar e retomar depois ("fechar a sessão") — isso é a skill fechar-sessao.
 ---
 
 # Finalizar tarefa
@@ -14,6 +14,16 @@ Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Ele vale para todas
 skills deste repositório: pergunta com escolha quando houver opções e aberta quando
 não houver, procedência dos identificadores, escrita fora do repositório só com pedido
 explícito, e saída honesta em vez de fechamento sem evidência.
+
+## Como ela chega aqui
+
+Nem sempre alguém diz "finalizar". Três entradas:
+- **Pedido explícito** ("vamos finalizar essa tarefa") → siga os passos.
+- **Pergunta se acabou** ("fizemos tudo?", "falta alguma coisa?") → faça os passos 1 e 2 e responda a
+  pergunta. Sobrou algo a fazer: liste e pare — não proponha finalizar. Não sobrou nada: diga isso e
+  siga para o passo 3.
+- **A sessão cumpriu o último item a fazer do doc** → ao terminar esse trabalho, diga que o doc ficou
+  sem nada a fazer e siga para o passo 3.
 
 ## Passo 1 — Achar o doc desta tarefa
 
@@ -43,19 +53,19 @@ Mostre em até 5 itens, o mais importante primeiro. Separe:
 Então uma pergunta só: finalizar assim? Se não houver nada aberto, diga isso e pergunte do mesmo
 jeito — apagar pede um sim explícito.
 
-Adiados com gatilho **não se perdem**: vão no corpo do commit de remoção (passo 4), que fica no
-`git log`. Se a pessoa quiser que algum continue visível, pergunte para onde (outro doc de pendências,
+Adiados com gatilho **não se perdem**: vão na resposta final (doc local) ou no corpo do commit de
+remoção (doc já versionado, passo 4). Se a pessoa quiser que algum continue visível, pergunte para onde (outro doc de pendências,
 issue) antes de remover.
 
-## Passo 4 — Remover, e commitar só se a pessoa quiser
+## Passo 4 — Remover, seguindo o modo do repo
 
-**Por padrão nada é commitado.** Veja se o doc é rastreado: `git ls-files --error-unmatch <doc>`.
+O modo é o que a `fechar-sessao` gravou: `git config --local --get pendencias.modo`.
 
-- **Doc local (não rastreado):** apague o arquivo (`rm`). Não há commit a fazer. Os adiados, que iriam
-  no corpo do commit, vão na resposta final — é o único registro que sobra; diga isso.
-- **Doc commitado:** na mesma pergunta de confirmação do passo 3, pergunte também se a remoção deve
-  ser commitada ou ficar só no disco (aparece como `deleted` no `git status`). Commitar é o que deixa
-  os adiados guardados no `git log`; diga isso na pergunta.
+- **`local`, ou doc não rastreado:** apague o arquivo (`rm`). Não há commit. Os adiados vão na
+  resposta final — é o único registro que sobra; diga isso.
+- **`compartilhado`:** commite a remoção (abaixo), sem perguntar de novo — o sim do passo 3 basta.
+- **Doc rastreado sem modo gravado:** na mesma pergunta do passo 3, pergunte se a remoção deve ser
+  commitada ou ficar só no disco. Commitar é o que deixa os adiados no `git log`; diga isso.
 
 Commitando, doc por tarefa:
 ```bash
@@ -72,9 +82,9 @@ Ficou de fora, por decisão: <adiados com o gatilho de volta; "nada" se nada>
 
 Doc de continuidade do repo (o CLAUDE.md manda mantê-lo): **não apague o arquivo**. Mova o bloco da
 tarefa para a seção de fechados do próprio doc ("Fechado em <data>"), pelas regras dele. Commitar
-segue a mesma pergunta — avise se o CLAUDE.md do repo espera o commit.
+segue a regra do repo.
 
-Push: só com autorização registrada para o repo; senão, avise que o commit espera o ok.
+Push: só com autorização registrada para o repo; senão, o commit sobe no próximo push do projeto.
 
 ## Passo 5 — Fechar a conversa
 
@@ -85,4 +95,4 @@ Uma linha com o commit, e uma com o que ficou em aberto por decisão (ou "nada f
 - Não finalizar sem o sim explícito, mesmo com tudo verde.
 - Não apagar doc de outra tarefa, nem o doc de continuidade do repo.
 - Não misturar código no commit de remoção.
-- Não commitar sem o sim da pessoa — nem a remoção.
+- Não commitar a remoção contra o modo gravado do repo.

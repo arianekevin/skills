@@ -278,8 +278,11 @@ outro; um só, ou dois candidatos, pergunta.
 segue a regra do repo e não cria pendências paralelas. Para não depender de interpretar o texto, o
 `CLAUDE.md` pode declarar: `Doc de pendências: docs/CONTINUIDADE.md`.
 
-**Não commita por padrão.** Escreve e pergunta: commitar ou manter local. Código não commitado nunca
-entra junto; vai para o "estado do ambiente".
+**Local ou junto do projeto, escolhido uma vez por repo.** Na primeira sessão fechada num repo, ela
+pergunta: o doc fica só na máquina, ou é commitado e sobe com o resto do trabalho? A resposta fica em
+`git config --local pendencias.modo` e vale dali em diante; pedido explícito diferente vale só para
+aquela vez. Em modo local, `docs/pendencias/` vai para o `.git/info/exclude`. O doc de continuidade
+que o repo exige segue a regra do repo.
 
 ## finalizar-tarefa
 
@@ -292,6 +295,10 @@ vamos finalizar essa tarefa
 Acha o doc da tarefa com o mesmo critério — mais estrito, porque o resultado é apagar — e aponta o que
 ainda está aberto: próximo passo não feito, adiados, push pendente, branch local. Código da tarefa não
 commitado **bloqueia**: não finaliza com trabalho solto.
+
+Não depende de alguém dizer "finalizar": também entra quando a pessoa pergunta se acabou ("fizemos
+tudo?") ou quando a sessão cumpre o último item do doc — e a `fechar-sessao` passa para ela quando o
+doc fica sem nada a fazer. Se sobrou algo, só responde o que falta.
 
 **Pede um sim explícito**, mesmo com tudo verde. Confirmado, remove o doc. Se o doc era commitado,
 pergunta também se commita a remoção — é o commit que guarda os adiados no `git log`, e a skill diz
