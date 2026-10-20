@@ -1,0 +1,18 @@
+{
+  "name": "montar-versao",
+  "description": "Builds a NectarCRM release: a main version (pom bump on top of alpha, tag vYY.Q.NNN) or a hotfix (vYY.Q.NNN.H) that starts from the latest version or hotfix and cherry-picks only the chosen commits — including fixes made on the PR after review — instead of the whole alpha. Pushes the tag (and the hotfix branch); never pushes alpha.",
+  "version": "1.0.0",
+  "author": {
+    "name": "arianecasas"
+  },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": [
+    "release",
+    "hotfix",
+    "tag",
+    "cherry-pick",
+    "nectarcrm"
+  ]
+}

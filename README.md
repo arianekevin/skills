@@ -15,6 +15,7 @@ instale só o que faz sentido na máquina.
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
 | **revisar-pr-bitbucket** | Revisa PRs do Bitbucket em três perguntas — resolve, quebra, abre brecha — e aplica: comentário + request changes, ou aprovação | genérico (Bitbucket + YouTrack) |
+| **montar-versao** | Monta a versão principal ou um hotfix só com os commits escolhidos, põe a tag e dá push nela | NectarCRM (padrões trocáveis por variável) |
 
 ## Instalação
 
@@ -30,11 +31,12 @@ instale só o que faz sentido na máquina.
 /plugin install bug-diagnostico@skills
 /plugin install bug-guardrail@skills
 /plugin install revisar-pr-bitbucket@skills
+/plugin install montar-versao@skills
 ```
 
 ## Padrões comuns
 
-As dez skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+As onze skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
 
 1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
    decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
@@ -370,6 +372,27 @@ quando o plugin atualiza.
 
 **Precisa de:** `BITBUCKET_EMAIL` + `BITBUCKET_API_TOKEN` (API token do Atlassian com
 `read:pullrequest:bitbucket` e `write:pullrequest:bitbucket`), `YOUTRACK_API_TOKEN`, e o clone do repo.
+
+---
+
+## montar-versao
+
+Versão e hotfix sem levar a alpha inteira. Tudo entra na alpha primeiro; daí:
+
+- **Versão principal** `vYY.T.NNN` (T = trimestre, NNN recomeça a cada trimestre): commit de bump
+  do pom em cima da ponta da alpha, com a tag. Dá push na tag; o bump só vai para a alpha quando o
+  dev pedir.
+- **Hotfix** `vYY.T.NNN.H`: parte da versão ou hotfix mais recente (ou de uma principal escolhida),
+  cria `hotfix/<versão>` num worktree e aplica por cherry-pick só os commits pedidos, na ordem em que
+  entraram na alpha. Não mexe no pom. Dá push na branch e na tag.
+
+Os commits vêm de ticket, PR ou SHA — inclusive as correções feitas no PR depois da revisão. Commit
+que não está na alpha é recusado; o que a base já tem (mesmo SHA ou mesmo patch) é pulado. Conflito
+desfaz tudo e aponta os commits da alpha que mexem nos mesmos arquivos, candidatos a dependência.
+`--plano` mostra o que faria sem criar nada.
+
+**Precisa de:** clone com `origin` e permissão de push de tag. Padrões do NectarCRM trocáveis por
+`ALPHA`, `POM` e `ARTIFACT`.
 
 ---
 
