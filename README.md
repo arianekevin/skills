@@ -380,8 +380,7 @@ quando o plugin atualiza.
 Versão e hotfix sem levar a alpha inteira. Tudo entra na alpha primeiro; daí:
 
 - **Versão principal** `vYY.T.NNN` (T = trimestre, NNN recomeça a cada trimestre): commit de bump
-  do pom em cima da ponta da alpha, com a tag. Dá push na tag; o bump só vai para a alpha quando o
-  dev pedir.
+  do pom em cima da ponta da alpha, com a tag. Dá push na tag e no bump na alpha, juntos (atômico).
 - **Hotfix** `vYY.T.NNN.H`: parte da versão ou hotfix mais recente (ou de uma principal escolhida),
   cria `hotfix/<versão>` num worktree e aplica por cherry-pick só os commits pedidos, na ordem em que
   entraram na alpha. Não mexe no pom. Dá push na branch e na tag.

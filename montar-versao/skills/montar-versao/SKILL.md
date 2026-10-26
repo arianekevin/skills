@@ -17,7 +17,7 @@ mudam por variável: `ALPHA` (origin/alpha), `POM` (br.com.colmeia.crm/pom.xml),
 
 Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Aqui pesa a escrita fora do
 repositório: invocar esta skill é o pedido para dar push **na tag** (e na branch do
-hotfix) que ela montar — não em outra coisa, e nunca na alpha.
+hotfix) que ela montar, e no commit de bump da principal na alpha — em mais nada.
 
 ```
 montar.sh principal [--plano]                          # sempre da ponta da origin/alpha
@@ -40,7 +40,7 @@ montar.sh servico   [--plano] <tag-do-crm>             # no clone do serviço
    desde a anterior.
 2. `montar.sh principal` cria, num worktree temporário, o commit
    `chore: bump versao para <versão>` no pom sobre a ponta da alpha e a tag nele.
-   Dá push só na tag; o bump vai para a alpha à parte (ver Publicar).
+   Dá push na tag e no bump na alpha, juntos (ver Publicar).
 
 ## Serviço que sobe junto
 
@@ -77,10 +77,10 @@ Quando o pedido inclui um serviço (ex.: "gera a versão no crm e no sparknectar
 
 ## Publicar
 
-O script dá push na tag (e, no hotfix, na branch `hotfix/<versão>`). Na principal o
-commit de bump não vai para a alpha sozinho: o script imprime o comando, e ele só roda
-quando a pessoa pedir. "Sobe" no vocabulário do time é pôr num ambiente (beta etc.),
-não mexer na alpha.
+O script dá push na tag (e, no hotfix, na branch `hotfix/<versão>`). Na principal, o
+commit de bump vai **sempre junto** para a alpha, no mesmo push atômico da tag: sobem
+os dois ou nenhum. Se a alpha andou nesse meio-tempo, o push é recusado e nada sobe;
+rode de novo. "Sobe" no vocabulário do time é pôr num ambiente (beta etc.).
 
 ## Erros comuns
 

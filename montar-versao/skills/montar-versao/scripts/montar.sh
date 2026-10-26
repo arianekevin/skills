@@ -5,7 +5,8 @@
 #   montar.sh hotfix    [--plano] [--base <tag>] <commit>...
 #   montar.sh servico   [--plano] <tag-do-crm>
 #
-# Principal: commit "chore: bump versao" no pom sobre a ponta da origin/alpha, com a tag.
+# Principal: commit "chore: bump versao" no pom sobre a ponta da origin/alpha, com a tag;
+# sobe a tag e o bump na alpha juntos.
 # Hotfix: parte da versão mais recente (principal ou hotfix; com --base vYY.T.NNN, a mais
 # recente daquela principal), cria hotfix/<nova> num worktree em .claude/worktrees/,
 # aplica só os commits pedidos (cherry-pick -x, na ordem em que entraram na alpha) e põe
@@ -88,9 +89,12 @@ principal)
   git -C "$wt" tag "$nova"
   git worktree remove "$wt"
 
-  git push -q origin "refs/tags/$nova"
-  echo "Pronto: tag $nova no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
-  echo "O bump ainda não está na alpha. Para levar: git push origin refs/tags/$nova:refs/heads/alpha"
+  # Tag e bump na alpha juntos: --atomic sobe os dois ou nenhum (alpha andou → recusa).
+  if ! git push -q --atomic origin "refs/tags/$nova" "refs/tags/$nova^{commit}:refs/heads/${ALPHA#origin/}"; then
+    git tag -d "$nova" >/dev/null
+    erro "push recusado (a ${ALPHA#origin/} andou?); nada subiu. Rode de novo"
+  fi
+  echo "Pronto: tag $nova e ${ALPHA#origin/} no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
   ;;
 
 hotfix)
