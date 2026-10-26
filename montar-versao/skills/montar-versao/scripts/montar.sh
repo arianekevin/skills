@@ -3,12 +3,15 @@
 #
 #   montar.sh principal [--plano]
 #   montar.sh hotfix    [--plano] [--base <tag>] <commit>...
+#   montar.sh servico   [--plano] <tag-do-crm>
 #
 # Principal: commit "chore: bump versao" no pom sobre a ponta da origin/alpha, com a tag.
 # Hotfix: parte da versão mais recente (principal ou hotfix; com --base vYY.T.NNN, a mais
 # recente daquela principal), cria hotfix/<nova> num worktree em .claude/worktrees/,
 # aplica só os commits pedidos (cherry-pick -x, na ordem em que entraram na alpha) e põe
 # a tag. O hotfix não mexe no pom. --plano mostra o que faria e não cria nada.
+# Serviço (rodado no clone do serviço que sobe junto com o CRM): põe a tag do CRM na
+# ponta da origin/alpha do serviço, sem bump. O número é sempre o do CRM, mesmo pulando.
 #
 # Saída: 0 ok · 2 uso/validação · 3 conflito no cherry-pick (nada fica criado).
 set -euo pipefail
@@ -168,8 +171,34 @@ hotfix)
   echo "Pronto: branch $branch e tag $nova no origin (worktree $wt)"
   ;;
 
+servico)
+  [ ${#args[@]} -eq 1 ] || erro "informe a tag do CRM (ex.: v26.4.007)"
+  nova=${args[0]}
+  grep -qE "$RE_VERSAO" <<<"$nova" || erro "tag inválida: $nova"
+  grep -qE "$RE_PRINCIPAL" <<<"$nova" || erro "$nova é hotfix; serviço só acompanha a versão principal"
+  existe_tag "$nova" && erro "tag $nova já existe"
+  alvo=$(git rev-parse "$ALPHA^{commit}")
+
+  anterior=$(versoes | grep -E "$RE_PRINCIPAL" | tail -1 || true)
+  echo "Serviço:          $(basename "$REPO")"
+  echo "Tag (do CRM):     $nova"
+  echo "Sobre:            $(git log -1 --format='%h %cs %s' "$alvo")"
+  if [ -n "$anterior" ]; then
+    [ "$(printf '%s\n%s\n' "$anterior" "$nova" | sort -V | tail -1)" = "$nova" ] \
+      || erro "$nova é anterior à última do serviço ($anterior)"
+    git merge-base --is-ancestor "refs/tags/$anterior" "$alvo" \
+      || erro "$ALPHA não contém a versão anterior $anterior"
+    echo "Desde $anterior:   $(git rev-list --count "refs/tags/$anterior..$alvo") commits"
+  fi
+  [ $plano = 1 ] && { echo "(plano: nada criado)"; exit 0; }
+
+  git tag "$nova" "$alvo"
+  git push -q origin "refs/tags/$nova"
+  echo "Pronto: tag $nova no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
+  ;;
+
 *)
-  sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
   ;;
 esac

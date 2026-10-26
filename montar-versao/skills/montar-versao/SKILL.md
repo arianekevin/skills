@@ -22,6 +22,7 @@ hotfix) que ela montar — não em outra coisa, e nunca na alpha.
 ```
 montar.sh principal [--plano]                          # sempre da ponta da origin/alpha
 montar.sh hotfix    [--plano] [--base vYY.T.NNN] <commit>...
+montar.sh servico   [--plano] <tag-do-crm>             # no clone do serviço
 ```
 
 ## Numeração
@@ -30,6 +31,8 @@ montar.sh hotfix    [--plano] [--base vYY.T.NNN] <commit>...
   de 3 dígitos no trimestre, recomeça em 001. É o que as tags v26.1–v26.4 seguem.
 - Hotfix: `vYY.T.NNN.H` — H sequência sobre aquela principal.
 - O script calcula; nunca escolha número à mão.
+- Serviço que sobe junto (sparknectarbi etc.): a tag é **sempre a do CRM**, mesmo que a
+  sequência do serviço pule números. Nunca calcule número próprio para o serviço.
 
 ## Versão principal
 
@@ -38,6 +41,16 @@ montar.sh hotfix    [--plano] [--base vYY.T.NNN] <commit>...
 2. `montar.sh principal` cria, num worktree temporário, o commit
    `chore: bump versao para <versão>` no pom sobre a ponta da alpha e a tag nele.
    Dá push só na tag; o bump vai para a alpha à parte (ver Publicar).
+
+## Serviço que sobe junto
+
+Quando o pedido inclui um serviço (ex.: "gera a versão no crm e no sparknectarbi"):
+
+1. Monte primeiro a principal do CRM: o `--plano` dela dá a tag.
+2. No `--plano`, mostre a mesma tag para cada serviço:
+   `REPO=<clone do serviço> montar.sh servico --plano <tag-do-crm>`.
+3. Depois de montar o CRM, rode `montar.sh servico <tag-do-crm>` em cada serviço. A tag
+   vai direto na ponta da alpha do serviço, **sem bump**: o bump é só do CRM.
 
 ## Hotfix
 

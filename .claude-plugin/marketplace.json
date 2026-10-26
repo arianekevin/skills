@@ -59,7 +59,7 @@
     {
       "name": "montar-versao",
       "source": "./montar-versao",
-      "description": "Builds a main version or a hotfix with only the chosen commits, tags it and pushes the tag (NectarCRM)."
+      "description": "Builds a main version or a hotfix with only the chosen commits, tags it and pushes the tag; services released alongside get the CRM tag (NectarCRM)."
     }
   ]
 }

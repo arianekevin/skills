@@ -391,6 +391,9 @@ que não está na alpha é recusado; o que a base já tem (mesmo SHA ou mesmo pa
 desfaz tudo e aponta os commits da alpha que mexem nos mesmos arquivos, candidatos a dependência.
 `--plano` mostra o que faria sem criar nada.
 
+- **Serviço que sobe junto** (`montar.sh servico <tag-do-crm>`): a tag é sempre a do CRM, mesmo
+  pulando números na sequência do serviço. Vai na ponta da alpha do serviço, sem bump.
+
 **Precisa de:** clone com `origin` e permissão de push de tag. Padrões do NectarCRM trocáveis por
 `ALPHA`, `POM` e `ARTIFACT`.
 
