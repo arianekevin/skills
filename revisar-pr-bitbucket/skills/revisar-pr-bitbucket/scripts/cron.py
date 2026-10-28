@@ -37,10 +37,10 @@ O que faz:
      (inconclusivo, erro ao aplicar, rodada cortada): conta uma tentativa.
   3b. Com o validador na esteira (REVISOR_VALIDADOR=1, em triagem): PR que passa não é aprovado no
      Bitbucket. Vai para a fila do validador ($REVISOR_DIR/trabalho/validacao-fila/<pr>/) e a rodada o
-     chama na hora ($REVISOR_VALIDAR --pr <pr>) e espera: provado, ele aprova, faz o merge e posta o
+     chama na hora ($REVISOR_VALIDAR --pr <pr>), sem esperar: provado, ele aprova, faz o merge e posta o
      comentário final na voz do revisor. O corretor faz o mesmo quando a correção dele é aprovada.
   3c. PR que o validador devolveu ($REVISOR_DIR/trabalho/validacao/<pr>/: a prova não fechou) é
-     reavaliado em seguida, na mesma execução (--so), ou na rodada seguinte se veio do cron do validador, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
+     reavaliado na rodada seguinte, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
      é o revisor: achado vai ao corretor (ou direto ao dev, se a validação já falhou depois do corretor);
      revisão mantida mesmo com a evidência vira aprovação com nota de merge manual.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
@@ -189,16 +189,20 @@ def proven(base, before):
 
 
 def validator(pr):
-    """Chama o validador neste PR e espera (a rodada segura o lock do revisor enquanto isso). Sem o comando
-    configurado, o PR fica na fila e o cron do validador o encontra."""
+    """Chama o validador neste PR, solto da rodada: a prova leva 15-25 min por PR e, esperando, a rodada segurava o
+    lock do revisor e os PRs novos ficavam parados. Um validador por vez (lock da prova); os outros esperam na fila
+    dele. O PR em validação fica fora da revisão (in_validation) e o que ele devolver entra na rodada seguinte.
+    Sem o comando configurado, o PR fica na fila e o cron do validador o encontra."""
     cmd = os.environ.get("REVISOR_VALIDAR")
     if not cmd:
         return log(f"#{pr}: na fila do validador (REVISOR_VALIDAR ausente: fica para o cron dele)")
-    log(f"#{pr}: validador chamado; aguardando")
-    subprocess.run(["flock", "/tmp/testador-prova.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
-                   cwd=CLONE, stdin=subprocess.DEVNULL, env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
-    log(f"#{pr}: validador terminou: " + subprocess.run(["bash", "-c", f"grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200"],
-                                                        capture_output=True, text=True).stdout.strip())
+    log(f"#{pr}: validador chamado")
+    done = (f"echo \"$(date '+%Y-%m-%d %H:%M') #{pr}: validador terminou: $(grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200)\""
+            f" >> {shlex.quote(str(DIR / 'cron.log'))}")
+    subprocess.Popen(["flock", "/tmp/testador-prova.lock", "bash", "-c",
+                      f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1; {done}"],
+                     cwd=CLONE, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+                     env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
 
 
 def wake():
@@ -633,9 +637,6 @@ def main():
     wake()
     for pr in validate:
         validator(pr)
-        if (FLAGS / pr / "marca.json").exists():  # a prova não fechou: reavalia já, com a evidência, sem esperar o cron
-            log(f"#{pr}: o validador devolveu; reavaliando agora com a evidência")
-            subprocess.run([sys.executable, __file__, "--so", pr], cwd=CLONE, stdin=subprocess.DEVNULL)
 
 
 if __name__ == "__main__":
