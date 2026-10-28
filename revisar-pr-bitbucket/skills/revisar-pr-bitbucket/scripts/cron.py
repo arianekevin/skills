@@ -11,6 +11,12 @@ Uso (crontab, em horário comercial; `flock` impede duas rodadas ao mesmo tempo)
 mudou). A aprovação de outro usuário não dá para retirar: se a revisão achar problema, o request
 changes que sai no fim pesa mais que ela.
 
+`--calibrar [gabarito.jsonl]` mede a régua: revisa de novo PRs já decididos, cada um no commit em que foi
+julgado, sem escrever nada (BITBUCKET_SO_LEITURA), e compara com o veredito certo. Para rodar à mão quando
+trocar o modelo (REVISOR_MODELO) ou mexer na SKILL.md. Gabarito padrão: $REVISOR_DIR/gabarito.jsonl, uma
+linha por PR: {"pr": 123, "commit": "<hash>", "veredito": "aprovado | ajuste", "categorias": [...], "nota": "..."}.
+Resultado em $REVISOR_DIR/calibracao/<data>-<plugin>-<modelo>.jsonl e o resumo na saída.
+
 `--urgente` é a via rápida: olha só os PRs que têm a conta do agente ($REVISOR_REVISOR) entre os
 revisores. O dev pede urgência adicionando essa conta como revisor do PR. Sem PR a revisar, sai
 sem fetch, sem chamar o Claude e sem escrever no log.
@@ -44,6 +50,8 @@ Ambiente (além das credenciais que a skill pede):
   REVISOR_TENTATIVAS  tentativas sem veredito no mesmo commit antes de desistir (padrão: 3)
   REVISOR_TIMEOUT     minutos até cortar a rodada (padrão: 50)
   REVISOR_CLAUDE      comando do Claude Code (padrão: claude)
+  REVISOR_MODELO      modelo do Claude na revisão (vira --model; sem ele, o padrão do Claude Code). Vai
+                      para o registro do veredito junto da versão do plugin, para medir a régua
   REVISOR_REVISOR     nome da conta do agente no Bitbucket, como aparece em "Reviewers"
                       (obrigatório com --urgente)
   REVISOR_AVISAR      comando que recebe o aviso como último argumento (ex.: um script que manda
@@ -67,6 +75,9 @@ MAX = int(os.environ.get("REVISOR_MAX", "10"))
 TENTATIVAS = int(os.environ.get("REVISOR_TENTATIVAS", "3"))
 TIMEOUT = int(os.environ.get("REVISOR_TIMEOUT", "50")) * 60
 CLAUDE = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
+MODEL = os.environ.get("REVISOR_MODELO")
+if MODEL:
+    CLAUDE += ["--model", MODEL]
 STATE = DIR / "estado.json"
 URGENT = "--urgente" in sys.argv[1:]
 ONLY = sys.argv[sys.argv.index("--so") + 1] if "--so" in sys.argv[1:-1] else None
@@ -82,7 +93,7 @@ VQUEUE = DIR / "trabalho" / "validacao-fila"
 PROVEN = DIR / "trabalho" / "validacao-provada"  # PR aprovado à mão que o validador já provou: falta o veredito do revisor
 AGENT_BRANCH = os.environ.get("REVISOR_BRANCH_AGENTE", "agente/")  # branch dos PRs do agente de bugfix
 VERDICTS = DIR / "trabalho" / "vereditos"  # o que a rodada registra; o cron junta em vereditos.jsonl, com a hora
-CATEGORIES = {"nao_corrige_o_ticket", "parcial", "efeito_colateral", "quebra_teste", "seguranca", "desempenho_banco",
+CATEGORIES = {"investigacao", "nao_corrige_o_ticket", "parcial", "efeito_colateral", "quebra_teste", "seguranca", "desempenho_banco",
               "conflito", "decisao_de_produto", "outro"}
 
 PROMPT = ("/revisar-pr-bitbucket Rodada automática, sem ninguém acompanhando: não pergunte nada. "
@@ -285,6 +296,26 @@ def to_review():
     return {**prs, **agent}
 
 
+def plugin_version():
+    try:
+        return json.loads((HERE.parents[2] / ".claude-plugin" / "plugin.json").read_text())["version"]
+    except (OSError, ValueError, KeyError):
+        return "?"
+
+
+def scores(v):
+    """Notas por eixo do registro: só os eixos conhecidos, nota inteira de 0 a 10."""
+    out = {}
+    for axis, s in (v.get("notas") or {}).items() if isinstance(v.get("notas"), dict) else ():
+        try:
+            n = int(s["n"] if isinstance(s, dict) else s)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if axis in ("seguranca", "risco", "ticket") and 0 <= n <= 10:
+            out[axis] = {"n": n, "porque": str(s.get("porque", ""))[:300] if isinstance(s, dict) else ""}
+    return out
+
+
 def keep_verdicts(record, out):
     """Junta o registro da rodada em vereditos.jsonl (histórico para estatística), com a hora e a rodada.
     Linha inválida ou categoria fora da lista é guardada como 'outro', para não perder o PR."""
@@ -299,8 +330,80 @@ def keep_verdicts(record, out):
                 continue
             cats = [c if c in CATEGORIES else "outro" for c in v.get("categorias") or []]
             fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": v.get("commit"),
-                                 "veredito": v.get("veredito"), "categorias": cats}, ensure_ascii=False) + "\n")
+                                 "tickets": [str(t) for t in v.get("tickets") or [] if isinstance(t, str)][:10], "veredito": v.get("veredito"), "categorias": cats, "notas": scores(v),
+                                 "plugin": plugin_version(), "modelo": MODEL or "padrão"}, ensure_ascii=False) + "\n")
     record.unlink()
+
+
+CALIBRATE = ("Calibração da régua, sem ninguém acompanhando: não pergunte nada. Só avalia: não escreva no Bitbucket "
+             "(pare no Passo 4; a escrita está bloqueada). Revise cada PR abaixo isoladamente, como ele estava no commit "
+             "indicado, contra a base indicada no destino: o diff é `git diff <base> <commit>` e o código é o do commit "
+             "(`git show <commit>:<arquivo>`). Ignore o estado atual do PR (mergeado, recusado, aprovado) e tudo o que veio "
+             "depois da data do commit: comentários do PR e do ticket, revisões, QA. É isso que está sendo medido.\n{prs}\n"
+             "Registre o veredito de cada PR em {record} (seção \"Registro do veredito\" da skill). "
+             "Escreva o relatório final em português.")
+
+
+def calibrate(answers):
+    """Revisa de novo, sem escrever, os PRs do gabarito e compara com o veredito certo."""
+    key = {}
+    for line in pathlib.Path(answers).expanduser().read_text().splitlines():
+        if line.strip():
+            v = json.loads(line)
+            key[str(v["pr"]).lstrip("#")] = v
+    subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
+    lines, missing = [], []
+    for pr, v in key.items():
+        c = subprocess.run(["git", "rev-parse", "--verify", "-q", v["commit"] + "^{commit}"], cwd=CLONE, capture_output=True, text=True)
+        if c.returncode != 0:
+            missing.append(pr)
+            continue
+        commit = c.stdout.strip()
+        base = subprocess.run(["git", "merge-base", commit, f"origin/{DEST}"], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        when = subprocess.run(["git", "show", "-s", "--format=%cI", commit], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        lines.append(f"- #{pr}: commit {commit[:12]}, base {base[:12]}, data do commit {when}")
+    if missing:
+        log(f"calibração: commit fora do clone, ficam de fora: {', '.join('#' + pr for pr in missing)}")
+    if not lines:
+        sys.exit("calibração: nenhum PR do gabarito com commit no clone")
+    stamp = f"{datetime.datetime.now():%Y%m%d-%H%M}"
+    out_dir = DIR / "calibracao"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    record = out_dir / f"{stamp}.registro.jsonl"
+    log(f"calibração: {len(lines)} PR(s), plugin {plugin_version()}, modelo {MODEL or 'padrão'}")
+    with open(out_dir / f"{stamp}.log", "w") as fh:
+        subprocess.run([*CLAUDE, "-p", "/revisar-pr-bitbucket " + CALIBRATE.format(prs="\n".join(lines), record=record)],
+                       cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT,
+                       env={**{k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")},
+                            "BITBUCKET_SO_LEITURA": "1"})
+    got = {}
+    if record.exists():
+        for line in record.read_text().splitlines():
+            try:
+                v = json.loads(line)
+                got[str(v["pr"]).lstrip("#")] = v
+            except (ValueError, KeyError, TypeError):
+                continue
+    result = out_dir / f"{stamp}-{plugin_version()}-{(MODEL or 'padrao').replace('/', '_')}.jsonl"
+    hits = cats = 0
+    with open(result, "w") as fh:
+        for pr, want in key.items():
+            if pr in missing:
+                continue
+            v = got.get(pr, {})
+            ok = v.get("veredito") == want.get("veredito")
+            same = set(v.get("categorias") or []) == set(want.get("categorias") or [])
+            hits += ok
+            cats += ok and same
+            fh.write(json.dumps({"pr": pr, "esperado": want.get("veredito"), "categorias_esperadas": want.get("categorias") or [],
+                                 "veredito": v.get("veredito"), "categorias": v.get("categorias") or [], "notas": scores(v),
+                                 "acertou": ok, "categorias_iguais": same, "nota_do_gabarito": want.get("nota", "")},
+                                ensure_ascii=False) + "\n")
+            if not ok or not same:
+                log(f"  #{pr}: esperado {want.get('veredito')} {want.get('categorias') or []}, veio {v.get('veredito') or 'sem registro'} {v.get('categorias') or []}")
+    n = len(key) - len(missing)
+    log(f"calibração: veredito certo em {hits} de {n}; veredito e categorias certos em {cats} de {n}. Detalhe em {result}")
+    record.unlink(missing_ok=True)
 
 
 def main():
@@ -309,6 +412,9 @@ def main():
     if URGENT and not REVIEWER:
         sys.exit("REVISOR_REVISOR ausente: --urgente precisa do nome da conta do agente no Bitbucket")
     os.chdir(CLONE)
+    if "--calibrar" in sys.argv[1:]:
+        i = sys.argv.index("--calibrar")
+        return calibrate(sys.argv[i + 1] if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("--") else DIR / "gabarito.jsonl")
     if URGENT and not to_review():  # a cada 2 min: sem pedido de urgência, sai antes do fetch
         return
     (DIR / "rodadas").mkdir(parents=True, exist_ok=True)

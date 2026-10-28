@@ -16,7 +16,9 @@ Fora do escopo: nome, estilo, refatoração, "dava para fazer melhor". Só entra
 ### O que é achado
 Achado é o que segura o merge: mergeado como está, o cliente do ticket continua com o erro, um fluxo em uso hoje quebra, dado se perde ou se corrompe, o banco trava, ou abre brecha. Com cenário que alguém vai encontrar em uso normal, não um caso de borda hipotético.
 
-**PR que não corrige o problema do ticket segura o merge, mesmo sendo inofensivo.** O merge fecha o ticket; se o erro do ticket continua acontecendo depois dele, o veredito é ❌. Não liberam: "o diff não quebra nada", "só melhora o log ou o diagnóstico", "só troca o nível ou o texto da mensagem", "o erro não aparece desde tal data, parece passageiro". Mudança só de diagnóstico pode até entrar, mas quem decide é uma pessoa, sabendo que o ticket fica aberto — diga isso no achado: o que o PR faz de fato, por que o erro do ticket continua, e que a escolha (recusar, ou manter como diagnóstico sem fechar o ticket) é do dev ou de produto. Se o PR já tem comentário de revisão anterior, de qualquer autor, dizendo que ele não corrige o ticket, e não houve commit depois, esse achado continua de pé: não aprove por cima dele.
+**PR que diz corrigir o problema do ticket e não corrige segura o merge, mesmo sendo inofensivo.** Se o erro do ticket continua acontecendo depois do merge, o veredito é ❌. Não liberam: "o diff não quebra nada", "só troca o nível ou o texto da mensagem", "o erro não aparece desde tal data, parece passageiro". Se o PR já tem comentário de revisão anterior, de qualquer autor, dizendo que ele não corrige o ticket, e não houve commit depois, esse achado continua de pé: não aprove por cima dele.
+
+**PR de investigação é a primeira etapa da solução, não achado.** Quando a causa ainda não é conhecida, o primeiro PR costuma só acrescentar log ou diagnóstico para descobri-la; como tudo passa por PR, a solução vem em duas etapas. Esse PR passa se o que ele registra serve para achar a causa do erro do ticket (o dado que falta aparece no ponto onde o erro acontece) e se não quebra nada nem expõe dado sensível no log. Ele não fecha o ticket: registre a categoria `investigacao` (ver "Registro do veredito"). Log que não chega perto do erro do ticket, ou PR que se apresenta como correção e só mexe em log, é ❌ como acima.
 
 O teste: se o dev responder "não vou mexer nisso", você seguraria o merge? Se não, não é achado — não vira ❌ nem ⚠️, não vira comentário, não entra no relatório. Não é achado:
 - caso de borda improvável, robustez que "seria bom ter", exatidão de comportamento auxiliar (desfazer, log, histórico) que continua funcionando;
@@ -80,8 +82,13 @@ Nunca faça checkout, commit ou push: só `git show`, `git diff`, `git grep`, `g
 
 Poucos PRs pequenos (até ~4): revise direto. Mais que isso, ou um PR grande: subagentes em paralelo, 3–5 tickets (ou um recorte do PR) por agente, agrupados por tema — permissão, validação de API, webhook/integração, job/migration —, empilhadas no mesmo agente. Cada agente recebe o bloco "Como revisar", o arquivo de contexto do projeto (se houver), os ids/branches/commits, o caminho dos JSON dos tickets e o foco do grupo ("gate de permissão: ache outras portas para a mesma ação").
 
+### Às cegas primeiro, a descrição depois
+Quem lê a explicação do autor antes do código tende a confirmar a tese dele em vez de testá-la. Por isso, em duas etapas:
+1. **Julgue sem a descrição do PR.** Fontes: o ticket, o diff, o código e os comentários de pessoas no PR. As três perguntas, o veredito e as notas saem daqui. Não leia a descrição antes de ter esse juízo (ela vem no `describe`; deixe para a etapa 2).
+2. **Depois, leia a descrição como alegação do autor a conferir.** Se ela explica uma escolha que faz sentido e o PR de fato corrige o problema do ticket, segue. Se ela afirma o que o código não faz ("corrige X" e o diff não toca no caminho de X), isso é achado. A descrição não derruba um achado de pé da etapa 1; quem derruba é o código, ou a palavra do dev num comentário (ver "Re-revisão").
+
 ### Como revisar (vale para você e para os agentes)
-- Leia o ticket inteiro (descrição, comentários de QA — "ampliação" — e o "como testar" do dev), a descrição e os comentários do PR.
+- Leia o ticket inteiro (descrição, comentários de QA — "ampliação" — e o "como testar" do dev) e os comentários do PR. A descrição do PR fica para depois do juízo (seção acima).
 - O fix bate com o erro real? Confira a causa declarada contra a stack, a mensagem e o schema (constraint, tipo de id, unique). Trocar `error` por `warn`, ou um catch que engole a exceção, esconde o sintoma, não corrige.
 - O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script, migration, ou o dev dizer no PR ou no ticket que o reparo foi feito direto no banco), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
@@ -161,10 +168,12 @@ Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado
 ### Registro do veredito
 Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisado (pulado não entra), no fim da revisão, valha o modo que for:
 ```json
-{"pr": 123, "commit": "<hash curto revisado>", "veredito": "aprovado | ajuste | inconclusivo", "categorias": ["..."]}
+{"pr": 123, "commit": "<hash curto revisado>", "tickets": ["WEB-1234"], "veredito": "aprovado | ajuste | inconclusivo", "categorias": ["..."],
+ "notas": {"seguranca": {"n": 10, "porque": "..."}, "risco": {"n": 7, "porque": "..."}, "ticket": {"n": 9, "porque": "..."}}}
 ```
-`categorias`: uma por tipo de achado de pé (❌/⚠️), sem repetir; lista vazia se aprovado ou inconclusivo. Só destes valores:
-- `nao_corrige_o_ticket`: o erro do ticket continua (não toca o ponto que falha, só mexe em log ou mensagem, correção desfeita)
+`tickets`: os ids do YouTrack que o PR trata (lista vazia se não houver). `categorias`: uma por tipo de achado de pé (❌/⚠️), sem repetir; lista vazia se aprovado ou inconclusivo, salvo `investigacao`. Só destes valores:
+- `investigacao`: PR de investigação aprovado (só log ou diagnóstico, primeira etapa; não fecha o ticket). Vai com veredito `aprovado`
+- `nao_corrige_o_ticket`: o erro do ticket continua (não toca o ponto que falha, se apresenta como correção e só mexe em log ou mensagem, correção desfeita)
 - `parcial`: corrige um caminho do ticket e deixa outro citado nele
 - `efeito_colateral`: a correção quebra ou muda outro comportamento (dado perdido ou sobrescrito, fluxo vizinho, regressão)
 - `quebra_teste`: teste que passava falha com o PR
@@ -174,7 +183,18 @@ Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisa
 - `decisao_de_produto`: o PR introduz comportamento que produto precisa confirmar
 - `outro`: achado que não cabe acima
 
+`notas`: de 0 a 10 em cada eixo, com o porquê em uma linha. Registram o juízo que você já fez; não o mudam, e não vão para o comentário.
+- `seguranca`: pergunta 3 (brecha). 10 = nada a apontar.
+- `risco`: pergunta 2 (quebra, inclusive banco). 10 = nada a apontar.
+- `ticket`: pergunta 1 (resolve) — o quanto o diff corrige o problema do ticket em todos os caminhos. PR de investigação: o quanto o log serve para achar a causa.
+
+Régua: 10 = nada a apontar; 7–9 = ressalva que não segura o merge; 5–6 = ⚠️ daquele eixo; abaixo de 5 = ❌ daquele eixo. Nota abaixo de 7 tem achado correspondente; achado de pé tem nota abaixo de 7 no seu eixo. Inconclusivo: `notas` vazio.
+
 O registro é estatística da esteira, não muda o veredito nem o comentário.
+
+## Calibração
+
+Só quando o pedido disser **calibração**. É a medida da régua: PRs já decididos revisados de novo, cada um no commit e na base indicados, para comparar com o veredito certo. Revise como sempre (às cegas primeiro), com três diferenças: o diff é o que o pedido indica, não o de `origin/<branch>`; o estado atual do PR e tudo o que veio depois da data do commit (comentários, revisões, QA, histórico do ticket) ficam de fora, porque dariam a resposta; e você para no Passo 4, só gravando o registro do veredito.
 
 ## Com corretor (modo triagem e modo portão)
 
@@ -182,7 +202,7 @@ Só quando o pedido disser **modo triagem** ou **modo portão**. Há um agente c
 
 ### Modo triagem
 Revise como sempre (Passos 1 a 4). Muda o Passo 5:
-- **✅** → aprova como sempre (com nota de produto: comenta e aprova). Se o pedido disser que quem aprova é o validador, não toque no Bitbucket: grave o `aprovado.md` indicado, com o que o PR corrige.
+- **✅** → aprova como sempre (com nota de produto: comenta e aprova). Se o pedido disser que quem aprova é o validador, não toque no Bitbucket: grave o `aprovado.md` indicado, com o que o PR corrige. PR de investigação: comece o texto com "Etapa de investigação: o ticket segue aberto." e diga o que o log vai mostrar.
 - **❌ ou ⚠️** → **não toque no Bitbucket**: nem comentário, nem request changes. Escreva os achados do PR em `<pasta indicada>/<número do PR>/achados.md`, um arquivo por PR, no formato do Passo 4 (cabeçalho `## <ticket ou título curto> (#<pr>)`).
 - **INCONCLUSIVO** → nada, como sempre.
 

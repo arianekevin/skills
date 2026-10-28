@@ -34,7 +34,11 @@ deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
 
 Ambiente (além do que cron.py já usa):
   CORRETOR_CLAUDE     comando do Claude Code do corretor, com as permissões dele (obrigatório)
+  CORRETOR_MODELO     modelo do Claude do corretor (vira --model; sem ele, o padrão do Claude Code).
+                      O portão usa o REVISOR_MODELO, como a rodada do revisor
   CORRETOR_DIR        onde ficam as cópias das branches (padrão: ~/corretor)
+  BUGFIX_DIR          pasta do agente de bugfix (padrão: ~/bugfix). Em PR da branch dele, o diagnóstico
+                      e as tentativas ($BUGFIX_DIR/trabalho/<ticket>/) vão ao corretor como contexto do autor
   CORRETOR_VOLTAS     voltas corretor/revisor por PR (padrão: 5)
   CORRETOR_MAX        PRs por execução (padrão: 10)
   CORRETOR_TIMEOUT    minutos até cortar cada sessão (padrão: 40)
@@ -66,8 +70,10 @@ CLONE = os.environ.get("REVISOR_CLONE")
 DIR = pathlib.Path(os.environ.get("REVISOR_DIR", "~/revisor")).expanduser()
 WORK = DIR / "trabalho" / "correcao"
 TREES = pathlib.Path(os.environ.get("CORRETOR_DIR", "~/corretor")).expanduser()
-REVISOR = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude"))
-CORRETOR = shlex.split(os.environ.get("CORRETOR_CLAUDE", ""))
+REVISOR = shlex.split(os.environ.get("REVISOR_CLAUDE", "claude")) + (["--model", os.environ["REVISOR_MODELO"]] if os.environ.get("REVISOR_MODELO") else [])
+CORRETOR = shlex.split(os.environ.get("CORRETOR_CLAUDE", "")) + (["--model", os.environ["CORRETOR_MODELO"]] if os.environ.get("CORRETOR_MODELO") else [])
+AGENT_BRANCH = os.environ.get("REVISOR_BRANCH_AGENTE", "agente/")
+BUGFIX = pathlib.Path(os.environ.get("BUGFIX_DIR", "~/bugfix")).expanduser()
 VOLTAS = int(os.environ.get("CORRETOR_VOLTAS", "5"))
 MAX = int(os.environ.get("CORRETOR_MAX", "10"))
 TIMEOUT = int(os.environ.get("CORRETOR_TIMEOUT", "40")) * 60
@@ -79,7 +85,7 @@ SECRET = re.compile(r"TOKEN|SECRET|PASSWORD|BITBUCKET_|YOUTRACK_|TEAMCITY_")
 
 HEAD = "Rodada automática, sem ninguém acompanhando: não pergunte nada. "
 ASK_FIX = ("/revisar-pr-bitbucket:corrigir-pr " + HEAD + "PR #{pr} ({branch} -> {dest}), volta {v} de {n}. O diretório atual é a sua "
-           "cópia da branch.{merged} Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{context}{verify} Escreva "
+           "cópia da branch.{merged} Achados: {work}/achados.md.{prev} Tickets (JSON): {issues}.{context}{author}{verify} Escreva "
            "{work}/resposta.md e, se mudar código, {work}/commit.txt. Responda em português.")
 ASK_GATE = ("/revisar-pr-bitbucket " + HEAD + "Modo portão, PR #{pr} ({branch} -> {dest}), volta {v} de {n}{last}. "
             "O diretório atual é a cópia da branch com a mudança do corretor sem commit.{merged_gate} Pasta: {work} "
@@ -98,6 +104,18 @@ def log(msg):
 def git(*args, cwd=None):
     r = subprocess.run(["git", *args], cwd=cwd or CLONE, capture_output=True, text=True)
     return r.returncode, (r.stdout if r.returncode == 0 else r.stderr).strip()
+
+
+def author(pr, branch):
+    """O que o autor do PR já sabe, para o corretor não repetir caminho descartado. Só o corretor recebe:
+    o revisor julga às cegas e lê a descrição depois, como alegação."""
+    where = f"a descrição do PR (`bitbucket.py describe {pr}`)"
+    if branch.startswith(AGENT_BRANCH):
+        diag = BUGFIX / "trabalho" / branch[len(AGENT_BRANCH):]
+        if diag.is_dir():
+            where += f" e o trabalho do agente de bugfix em {diag} (diagnostico.json, plano.md, tentativas/*/sessao.log)"
+    return (f" O que o autor já sabe está em {where}: causa que ele achou, o que tentou e descartou. Use para não "
+            "repetir caminho descartado; não é evidência — o que vale é o código.")
 
 
 def session(cmd, prompt, cwd, env, out):
@@ -293,6 +311,7 @@ def correct(base, pr, dry, only_resolved=False):
     ctx = pathlib.Path("~/.claude/revisar-pr-bitbucket/contexto").expanduser() / f"{bitbucket.resolve_repo(None).split('/')[-1]}.md"
     fmt = dict(pr=pr, branch=branch, dest=dest, n=VOLTAS, work=work, issues=issues,
                context=f" Antes de tudo, leia o contexto do projeto: {ctx}." if ctx.exists() else "",
+               author=author(pr, branch),
                verify=f" Para verificar, rode na cópia: {VERIFY}" if VERIFY else "",
                merged={"limpo": f" A {dest} atual já foi trazida para ela (merge sem conflito, commitado): o diff é só o que você mudar.",
                        "conflito": f" A {dest} atual foi trazida para ela e o merge parou em conflito (`git status` mostra os arquivos): "

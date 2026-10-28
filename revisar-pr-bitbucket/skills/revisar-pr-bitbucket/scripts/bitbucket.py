@@ -65,6 +65,8 @@ def resolve_repo(arg):
 
 
 def call(method, path, body=None, params=None):
+    if method != "GET" and os.environ.get("BITBUCKET_SO_LEITURA"):  # calibração do revisor: nada é escrito
+        return 403, f"BITBUCKET_SO_LEITURA: {method} {path} recusado"
     bearer = os.environ.get("BITBUCKET_ACCESS_TOKEN")
     email, token = os.environ.get("BITBUCKET_EMAIL"), os.environ.get("BITBUCKET_API_TOKEN")
     if bearer:
