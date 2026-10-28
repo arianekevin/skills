@@ -1,0 +1,18 @@
+{
+  "name": "modo-noturno",
+  "description": "Night mode for the current work: the dev went to sleep, so it does everything already agreed without interrupting, makes the small calls on sensible defaults and logs them, and freezes the high-impact decisions as questions — implementing the recommended option on a side branch when it is safe to. Stops only when nothing is left that it can do alone, and leaves the report both in the chat and in the task's pending doc.",
+  "version": "1.0.0",
+  "author": {
+    "name": "arianecasas"
+  },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": [
+    "autonomous",
+    "unattended",
+    "overnight",
+    "workflow",
+    "skill"
+  ]
+}

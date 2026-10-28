@@ -1,6 +1,6 @@
 # Qual doc é o desta tarefa — e quando não é
 
-Usado por `fechar-sessao` e `finalizar-tarefa`. O erro caro é o silencioso: escrever a sessão de hoje
+Usado por `fechar-sessao`, `finalizar-tarefa` e `modo-noturno`. O erro caro é o silencioso: escrever a sessão de hoje
 no doc de outra tarefa, ou apagar o doc errado. Na dúvida, perguntar — uma pergunta, com as opções.
 
 ## 1. O repo tem doc de continuidade próprio?

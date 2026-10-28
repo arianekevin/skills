@@ -10,6 +10,7 @@ instale só o que faz sentido na máquina.
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
 | **pauta** | Captura a melhoria pequena do dia — ou o bug já diagnosticado — como item que um agente sem supervisão consegue executar | genérico |
 | **turno** | Executa os itens prontos de madrugada, sozinho, e deixa o relatório da manhã | genérico |
+| **modo-noturno** | Toca sozinho o trabalho combinado da sessão enquanto você dorme; decide o pequeno e guarda o grande para a manhã | genérico |
 | **fechar-sessao** | Registra onde a sessão parou — feito, combinado, adiado, próximo passo — para a próxima retomar | genérico |
 | **finalizar-tarefa** | Aponta o que ainda está aberto, pede o sim e aposenta o doc de pendências da tarefa | genérico |
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
@@ -26,6 +27,7 @@ instale só o que faz sentido na máquina.
 /plugin install ciclo@skills
 /plugin install pauta@skills
 /plugin install turno@skills
+/plugin install modo-noturno@skills
 /plugin install fechar-sessao@skills
 /plugin install finalizar-tarefa@skills
 /plugin install bug-diagnostico@skills
@@ -36,7 +38,7 @@ instale só o que faz sentido na máquina.
 
 ## Padrões comuns
 
-As onze skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
+As doze skills compartilham um [`PADROES.md`](PADROES.md) — as regras transversais, escritas uma vez:
 
 1. **Pergunta** — escolha para marcar quando as respostas são enumeráveis; pergunta aberta quando a
    decisão é só do dev e não há alternativas a oferecer. O critério não é "sempre dar opções", é nunca
@@ -51,8 +53,8 @@ As onze skills compartilham um [`PADROES.md`](PADROES.md) — as regras transver
 
 O arquivo da raiz é a fonte única. Cada plugin é instalado isoladamente, então a cópia precisa viajar
 junto: `scripts/sync-padroes.sh` replica o arquivo para dentro de todos. **Edite a raiz e rode o
-script** — nunca as cópias. O mesmo vale para `compartilhado/identificar-doc.md`, que só o par
-`fechar-sessao`/`finalizar-tarefa` usa.
+script** — nunca as cópias. O mesmo vale para `compartilhado/identificar-doc.md`, que `fechar-sessao`,
+`finalizar-tarefa` e `modo-noturno` usam.
 
 ---
 
@@ -255,6 +257,32 @@ de manhã uma branch que você não reconhece é o primeiro susto que ela poupa.
 **O relatório** abre com o veredito em números, põe o que falhou antes do que deu certo, cola a saída
 em vez de parafrasear, lista o que ela viu e **não** fez (a noite enxerga o que ninguém enxerga de
 dia), e fecha com os comandos de desfazer. Nada é publicado: sem `push`, sem PR.
+
+---
+
+## modo-noturno
+
+Você vai dormir no meio de um trabalho. Ela continua **o que já está combinado na sessão** — conversa,
+doc de pendências, plano — sem interromper, e só para quando não sobra nada que dê para fazer sozinha.
+
+```
+modo noturno
+vou dormir, toca aí
+```
+
+**A régua da decisão:** se errar, você desfaz de manhã em poucos minutos sem perder nada? Então ela
+decide, pelo padrão do projeto, e anota em "decidi sozinha". Se não — destrutivo, sai da máquina,
+arquitetura, regra de produto, segurança, custo, ou mudar o combinado —, ela **congela** e guarda a
+pergunta com opções e recomendação.
+
+**Congelado não para a noite:** quando é seguro, ela implementa a opção recomendada numa branch à
+parte (`noturno/<data>-<slug>`, em worktree), e de manhã você só aprova ou recusa.
+
+**Relatório nos dois lugares:** no doc de pendências da tarefa e no chat, perguntas primeiro. As
+perguntas voltam como escolha para marcar quando você acordar.
+
+Diferença para a `turno`: a `turno` roda itens já preparados pela `pauta` e não decide nada; esta
+continua um trabalho aberto e decide o que é pequeno.
 
 ---
 
