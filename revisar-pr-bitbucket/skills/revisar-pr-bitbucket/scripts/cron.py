@@ -581,6 +581,9 @@ def main():
             state.pop(pr, None)
             if pr in back and pr not in after:
                 unflag(pr, "revisado")
+            if fresh and pr not in after and pr not in forced:  # fechado (mergeado, recusado) no meio da rodada: os achados não vão a ninguém
+                (WORK / "feitos").mkdir(parents=True, exist_ok=True)
+                shutil.move(str(WORK / pr), str(WORK / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-fechado"))
             continue
         if fresh and pr in again:  # a correção automática já foi tentada: o achado vai direto ao dev
             for cmd, arg in (("comment", str(found)), ("request-changes", pr)):
