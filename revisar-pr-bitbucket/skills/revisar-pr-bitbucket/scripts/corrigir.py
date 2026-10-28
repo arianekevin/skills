@@ -64,6 +64,7 @@ Ambiente (além do que cron.py já usa):
 import argparse, datetime, fcntl, json, os, pathlib, re, shlex, shutil, subprocess, sys, time
 
 import bitbucket
+import passos
 
 HERE = pathlib.Path(__file__).resolve().parent
 CLONE = os.environ.get("REVISOR_CLONE")
@@ -119,14 +120,11 @@ def author(pr, branch):
 
 
 def session(cmd, prompt, cwd, env, out):
-    """Uma sessão do Claude sem supervisão; a saída vai para `out`. Devolve como terminou."""
-    with open(out, "w") as fh:
-        try:
-            r = subprocess.run([*cmd, "-p", prompt], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                               stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT)
-            return f"saiu com {r.returncode}"
-        except subprocess.TimeoutExpired:
-            return f"cortada aos {TIMEOUT // 60} min"
+    """Uma sessão do Claude sem supervisão; a saída vai para `out` e os passos para <out>.passos.jsonl. Devolve como terminou."""
+    try:
+        return f"saiu com {passos.run(cmd, prompt, cwd, env, out, TIMEOUT)}"
+    except subprocess.TimeoutExpired:
+        return f"cortada aos {TIMEOUT // 60} min"
 
 
 def suite(tree, out):

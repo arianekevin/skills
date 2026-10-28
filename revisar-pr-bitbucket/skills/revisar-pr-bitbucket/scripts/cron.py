@@ -71,6 +71,7 @@ Ambiente (além das credenciais que a skill pede):
 import datetime, fcntl, json, os, pathlib, shlex, shutil, subprocess, sys
 
 import bitbucket
+import passos
 
 HERE = pathlib.Path(__file__).resolve().parent
 CLONE = os.environ.get("REVISOR_CLONE")
@@ -555,16 +556,15 @@ def main():
             prompt += (f" Em {', '.join('#' + pr for pr in again)} a validação já falhou mais de uma vez, inclusive depois do "
                        "corretor: se houver achado, não mande ao corretor — escreva o achado para o dev (no achados.md, como "
                        "sempre) dizendo que a correção automática já foi tentada.")
-    with open(out, "w") as fh:
-        try:
-            r = subprocess.run([*CLAUDE, "-p", prompt], cwd=CLONE, stdout=fh, stderr=subprocess.STDOUT, timeout=TIMEOUT,
-                               env={k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")})
-            end = f"claude saiu com {r.returncode}"
-        except subprocess.TimeoutExpired:
-            end = f"cortada aos {TIMEOUT // 60} min"
-        except FileNotFoundError:
-            warn(f"comando do Claude não encontrado: {CLAUDE[0]}")
-            sys.exit(1)
+    try:
+        code = passos.run(CLAUDE, prompt, CLONE, {k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")},
+                          out, TIMEOUT)
+        end = f"claude saiu com {code}"
+    except subprocess.TimeoutExpired:
+        end = f"cortada aos {TIMEOUT // 60} min"
+    except FileNotFoundError:
+        warn(f"comando do Claude não encontrado: {CLAUDE[0]}")
+        sys.exit(1)
 
     keep_verdicts(record, out)
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
