@@ -17,6 +17,11 @@ trocar o modelo (REVISOR_MODELO) ou mexer na SKILL.md. Gabarito padrão: $REVISO
 linha por PR: {"pr": 123, "commit": "<hash>", "veredito": "aprovado | ajuste", "categorias": [...], "nota": "..."}.
 Resultado em $REVISOR_DIR/calibracao/<data>-<plugin>-<modelo>.jsonl e o resumo na saída.
 
+`--varrer [--aplicar]` é a passada diária nos PRs abertos cujo ticket já fechou: todos os tickets do PR
+resolvidos no YouTrack (campo `resolved`, vale para Finalizado, Cancelado, Aprovado, Done...) há mais de
+$REVISOR_VARRER_HORAS horas (padrão 24), e nenhum commit no PR depois disso. Esse PR é recusado, com o motivo na
+própria recusa. Sem --aplicar só lista o que recusaria. Não chama o Claude. PR sem ticket fica.
+
 `--urgente` é a via rápida: olha só os PRs que têm a conta do agente ($REVISOR_REVISOR) entre os
 revisores. O dev pede urgência adicionando essa conta como revisor do PR. Sem PR a revisar, sai
 sem fetch, sem chamar o Claude e sem escrever no log.
@@ -344,6 +349,59 @@ CALIBRATE = ("Calibração da régua, sem ninguém acompanhando: não pergunte n
              "Escreva o relatório final em português.")
 
 
+TICKET = __import__("re").compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
+SWEEP_HOURS = int(os.environ.get("REVISOR_VARRER_HORAS", "24"))
+
+
+def resolved(ticket):
+    """Quando o ticket foi resolvido (datetime) e em que estado, ou (None, estado). Erro de leitura: (None, None)."""
+    import urllib.request, urllib.parse
+    url = (os.environ.get("YOUTRACK_URL", "").rstrip("/") + f"/api/issues/{ticket}?"
+           + urllib.parse.urlencode({"fields": "resolved,customFields(name,value(name))"}))
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {os.environ.get('YOUTRACK_API_TOKEN', '')}",
+                                               "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            d = json.load(r)
+    except Exception:
+        return None, None
+    state = next((c["value"].get("name") for c in d.get("customFields", [])
+                  if c.get("name") == "State" and isinstance(c.get("value"), dict)), "?")
+    when = d.get("resolved")
+    return (datetime.datetime.fromtimestamp(when / 1000, datetime.timezone.utc) if when else None), state
+
+
+def sweep(apply):
+    """PR aberto cujo ticket fechou há mais de SWEEP_HOURS e que não recebeu commit depois: recusa com o motivo."""
+    subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
+    base = f"{bitbucket.resolve_repo(None)}/pullrequests"
+    limit = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=SWEEP_HOURS)
+    found = 0
+    for p in bitbucket.open_prs(base, DEST):
+        pr, branch = str(p["id"]), p["source"]["branch"]["name"]
+        tickets = list(dict.fromkeys(TICKET.findall(f"{branch} {p['title']}")))
+        if not tickets:
+            continue
+        info = {t: resolved(t) for t in tickets}
+        if any(when is None or when > limit for when, _ in info.values()):
+            continue  # algum ticket aberto, recente ou ilegível: fica
+        closed = max(when for when, _ in info.values())
+        last = subprocess.run(["git", "show", "-s", "--format=%cI", f"origin/{branch}"], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        if not last or datetime.datetime.fromisoformat(last) > closed:
+            continue  # commit depois do fechamento: alguém ainda mexe nele
+        local = lambda d: d.astimezone().strftime("%d/%m")
+        why = (", ".join(f"{t} foi fechado como {state} em {local(when)}" for t, (when, state) in info.items())
+               + f"; o PR não recebeu commit desde {local(datetime.datetime.fromisoformat(last))}. Recusado por não ser mais "
+               "relevante. A branch continua; se ainda houver algo a entrar, abra um PR novo.")
+        found += 1
+        if not apply:
+            log(f"#{pr}: ENSAIO, recusaria — {why}")
+            continue
+        st, r = bitbucket.call("POST", f"{base}/{pr}/decline", body={"message": why})
+        log(f"#{pr}: recusado — {why}" if st == 200 else f"#{pr}: recusa FALHOU (ERRO {st} {str(r)[:160]})")
+    log(f"varredura: {found} PR(s) com ticket fechado há mais de {SWEEP_HOURS} h" + ("" if apply else " (ensaio)"))
+
+
 def calibrate(answers):
     """Revisa de novo, sem escrever, os PRs do gabarito e compara com o veredito certo."""
     key = {}
@@ -412,6 +470,8 @@ def main():
     if URGENT and not REVIEWER:
         sys.exit("REVISOR_REVISOR ausente: --urgente precisa do nome da conta do agente no Bitbucket")
     os.chdir(CLONE)
+    if "--varrer" in sys.argv[1:]:
+        return sweep("--aplicar" in sys.argv[1:])
     if "--calibrar" in sys.argv[1:]:
         i = sys.argv.index("--calibrar")
         return calibrate(sys.argv[i + 1] if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("--") else DIR / "gabarito.jsonl")
