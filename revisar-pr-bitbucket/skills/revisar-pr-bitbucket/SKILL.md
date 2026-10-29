@@ -91,6 +91,7 @@ Quem lê a explicação do autor antes do código tende a confirmar a tese dele 
 - Leia o ticket inteiro (descrição, comentários de QA — "ampliação" — e o "como testar" do dev) e os comentários do PR. A descrição do PR fica para depois do juízo (seção acima).
 - O fix bate com o erro real? Confira a causa declarada contra a stack, a mensagem e o schema (constraint, tipo de id, unique). Trocar `error` por `warn`, ou um catch que engole a exceção, esconde o sintoma, não corrige.
 - O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script, migration, ou o dev dizer no PR ou no ticket que o reparo foi feito direto no banco), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
+- Refaça o caminho de quem vai testar o ticket. Do "como reproduzir" (tela ou endpoint), liste as entradas que levam ao sintoma — a mesma tela costuma ter mais de uma (página cheia, painel lateral, edição rápida, modal; cada uma pode chamar outra rota) — e as variantes de dado que o ticket ou a ação implicam (formato com e sem máscara, campo vazio, criar, editar e desativar, registro removido). Confira cada uma contra o diff. A que o PR não cobre e cai no mesmo sintoma é `parcial`.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
 - Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)?
 - Catch que só loga + nova validação = dado perdido em silêncio (lead, importação, webhook).
@@ -169,8 +170,10 @@ Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado
 Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisado (pulado não entra), no fim da revisão, valha o modo que for:
 ```json
 {"pr": 123, "commit": "<hash curto revisado>", "tickets": ["WEB-1234"], "veredito": "aprovado | ajuste | inconclusivo", "categorias": ["..."],
- "notas": {"seguranca": {"n": 10, "porque": "..."}, "risco": {"n": 7, "porque": "..."}, "ticket": {"n": 9, "porque": "..."}}}
+ "depende_de": [], "notas": {"seguranca": {"n": 10, "porque": "..."}, "risco": {"n": 7, "porque": "..."}, "ticket": {"n": 9, "porque": "..."}}}
 ```
+`depende_de` (opcional): partes da correção do ticket que estão fora deste PR, em outro repositório ou em outro PR, sem as quais quem testar o ticket ainda vê o problema. Uma entrada por parte: `{"repo": "<repositório>", "ref": "<commit, branch ou PR, se o ticket ou o PR disser>", "o_que": "<uma linha>"}`. Lista vazia ou ausente quando o PR fecha sozinho. Não é achado: o PR segue no veredito que tiver; quem consome o registro decide o que fazer com o ticket.
+
 `tickets`: os ids do YouTrack que o PR trata (lista vazia se não houver). `categorias`: uma por tipo de achado de pé (❌/⚠️), sem repetir; lista vazia se aprovado ou inconclusivo, salvo `investigacao`. Só destes valores:
 - `investigacao`: PR de investigação aprovado (só log ou diagnóstico, primeira etapa; não fecha o ticket). Vai com veredito `aprovado`
 - `nao_corrige_o_ticket`: o erro do ticket continua (não toca o ponto que falha, se apresenta como correção e só mexe em log ou mensagem, correção desfeita)
@@ -189,6 +192,8 @@ Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisa
 - `ticket`: pergunta 1 (resolve) — o quanto o diff corrige o problema do ticket em todos os caminhos. PR de investigação: o quanto o log serve para achar a causa.
 
 Régua: 10 = nada a apontar; 7–9 = ressalva que não segura o merge; 5–6 = ⚠️ daquele eixo; abaixo de 5 = ❌ daquele eixo. Nota abaixo de 7 tem achado correspondente; achado de pé tem nota abaixo de 7 no seu eixo. Inconclusivo: `notas` vazio.
+
+Ressalva que você não conferiu não é 7–9. "A conferir no ambiente", "o teste não roda contra o banco", "não vi se X chama isto" é dúvida sobre o eixo, não ressalva menor: confira no código. Se a dúvida cai, a nota sobe; se fica de pé e o cenário é de uso normal, é ⚠️ do eixo (nota 5–6) com "(a confirmar: o que faltou olhar)". Dependência de outro repositório não é dúvida: vai em `depende_de` e não baixa a nota.
 
 O registro é estatística da esteira, não muda o veredito nem o comentário.
 

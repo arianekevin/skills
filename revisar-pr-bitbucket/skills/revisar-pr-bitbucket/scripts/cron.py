@@ -326,6 +326,15 @@ def scores(v):
     return out
 
 
+def depends(v):
+    """Partes da correção fora do PR (outro repositório ou PR), como a revisão declarou; o que vier torto é descartado."""
+    out = []
+    for d in v.get("depende_de") or []:
+        if isinstance(d, dict) and d.get("repo"):
+            out.append({k: str(d.get(k) or "")[:200] for k in ("repo", "ref", "o_que")})
+    return out[:5]
+
+
 def keep_verdicts(record, out):
     """Junta o registro da rodada em vereditos.jsonl (histórico para estatística), com a hora e a rodada.
     Linha inválida ou categoria fora da lista é guardada como 'outro', para não perder o PR."""
@@ -341,6 +350,7 @@ def keep_verdicts(record, out):
             cats = [c if c in CATEGORIES else "outro" for c in v.get("categorias") or []]
             fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": v.get("commit"),
                                  "tickets": [str(t) for t in v.get("tickets") or [] if isinstance(t, str)][:10], "veredito": v.get("veredito"), "categorias": cats, "notas": scores(v),
+                                 "depende_de": depends(v),
                                  "plugin": plugin_version(), "modelo": MODEL or "padrão"}, ensure_ascii=False) + "\n")
     record.unlink()
 
