@@ -43,6 +43,9 @@ O que faz:
      reavaliado na rodada seguinte, sem a aprovação do próprio revisor, com a evidência no pedido. Quem fala com o dev
      é o revisor: achado vai ao corretor (ou direto ao dev, se a validação já falhou depois do corretor);
      revisão mantida mesmo com a evidência vira aprovação com nota de merge manual.
+  3d. Achado vai direto ao dev, sem o corretor, quando o corretor não tem o que fazer: todas as categorias da
+     revisão são nao_corrige_o_ticket ou decisao_de_produto, ou a última volta dele no PR terminou sem mudança, não
+     houve commit depois e a revisão não viu decisão nova nos comentários. Conflito com o destino segue com o corretor.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
      no PR depois da última tentativa zera a contagem: commit, comentário, mudança de estado
      (saiu do draft, marca removida, título ou descrição editados).
@@ -68,7 +71,7 @@ Ambiente (além das credenciais que a skill pede):
                       tem cron: esta rodada o dispara assim que termina, se houver PR na fila e
                       nenhum corretor rodando (saída dele em $REVISOR_DIR/corretor.log).
 """
-import datetime, fcntl, json, os, pathlib, shlex, shutil, subprocess, sys
+import datetime, fcntl, json, os, pathlib, re, shlex, shutil, subprocess, sys
 
 import bitbucket
 import passos
@@ -284,6 +287,42 @@ def hold(pr, files, commit, quiet=False):
             return False
     log(f"#{pr}: conflita com a {DEST} ({len(files)} arquivo(s)); request changes pedindo a atualização da branch")
     return True
+
+
+DIRECT = "<!-- direto ao dev -->"  # primeira linha do achados.md: a revisão mandou o achado ao dev, sem o corretor
+NO_FIX = {"nao_corrige_o_ticket", "decisao_de_produto"}  # o corretor não tem o que fazer: falta causa ou decisão
+
+
+def last_noop(pr):
+    """Commit em que a última volta do corretor neste PR terminou sem mudar nada (parcial sem correção), ou None."""
+    feitos = WORK / "feitos"
+    runs = sorted(d for d in feitos.glob(f"*-{pr}") if re.fullmatch(rf"\d{{8}}-\d{{4}}-{pr}", d.name)) if feitos.is_dir() else []
+    if not runs:
+        return None
+    try:
+        v = json.loads((runs[-1] / "veredito.json").read_text())
+        if v.get("estado") == "aprovado" or v.get("corrigido"):
+            return None
+        return json.loads((runs[-1] / "marca.json").read_text()).get("commit")
+    except (OSError, ValueError):
+        return None
+
+
+def round_categories(rodada, pr):
+    """Categorias que a revisão desta rodada registrou para o PR."""
+    cats = []
+    try:
+        with open(DIR / "vereditos.jsonl") as fh:
+            for line in fh:
+                try:
+                    v = json.loads(line)
+                except ValueError:
+                    continue
+                if v.get("rodada") == rodada and str(v.get("pr")) == pr:
+                    cats = v.get("categorias") or []
+    except OSError:
+        pass
+    return cats
 
 
 def to_review():
@@ -566,6 +605,13 @@ def main():
             prompt += (f" Em {', '.join('#' + pr for pr in again)} a validação já falhou mais de uma vez, inclusive depois do "
                        "corretor: se houver achado, não mande ao corretor — escreva o achado para o dev (no achados.md, como "
                        "sempre) dizendo que a correção automática já foi tentada.")
+    noop = [pr for pr in todo if TRIAGE and pr not in again and last_noop(pr) == before[pr]]
+    if noop:
+        prompt += (f" Em {', '.join('#' + pr for pr in noop)} a última volta do corretor terminou sem mudar nada e não houve commit "
+                   "depois. Só mande ao corretor se um comentário novo trouxe a decisão ou a resposta que um achado esperava "
+                   "(\"Decisão que chega por comentário\"). Se não trouxe, o achado vai direto ao dev: escreva o achados.md como "
+                   "comentário de re-revisão (só o que mudou; se nada mudou, a linha de re-revisão) e ponha "
+                   f"`{DIRECT}` sozinho na primeira linha.")
     try:
         code = passos.run(CLAUDE, prompt, CLONE, {k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")},
                           out, TIMEOUT)
@@ -599,15 +645,22 @@ def main():
                 (WORK / "feitos").mkdir(parents=True, exist_ok=True)
                 shutil.move(str(WORK / pr), str(WORK / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-fechado"))
             continue
-        if fresh and pr in again:  # a correção automática já foi tentada: o achado vai direto ao dev
+        cats = round_categories(out.name, pr) if fresh else []
+        why = ("validação falhou de novo depois do corretor" if pr in again
+               else "a revisão mandou direto (corretor já tentou sem mudança e não há decisão nova)" if fresh and found.read_text().lstrip().startswith(DIRECT)
+               else f"só achado que o corretor não resolve ({', '.join(cats)})" if fresh and cats and set(cats) <= NO_FIX
+               else None)
+        if fresh and why:  # o corretor não tem o que fazer: o achado vai direto ao dev
+            found.write_text(found.read_text().replace(DIRECT, "", 1).lstrip())
             for cmd, arg in (("comment", str(found)), ("request-changes", pr)):
                 r = subprocess.run([sys.executable, str(HERE / "bitbucket.py"), cmd, arg, "--isolado"], cwd=CLONE, capture_output=True, text=True)
                 if not r.stdout.strip().endswith("ok"):
                     log(f"#{pr}: {cmd} FALHOU ({(r.stdout + r.stderr).strip()[:160]})")
-            log(f"#{pr}: validação falhou de novo depois do corretor; achado e request changes direto para o dev")
+            log(f"#{pr}: {why}; achado e request changes direto para o dev")
             (WORK / "feitos").mkdir(parents=True, exist_ok=True)
             shutil.move(str(WORK / pr), str(WORK / "feitos" / f"{datetime.datetime.now():%Y%m%d-%H%M}-{pr}-dev"))
-            unflag(pr, "dev")
+            if pr in back:
+                unflag(pr, "dev")
             state.pop(pr, None)
             continue
         if fresh:  # vai ao corretor

@@ -220,7 +220,9 @@ O `achados.md` é tudo o que o corretor vai ler, então:
 
 **Pedido de ajuste por comentário.** Se o dev pede que o ajuste seja feito ("pode corrigir", "aplica a opção B"), vale quando está ligado a um achado ou a uma decisão pendente deste PR: trate como a decisão acima. Pedido que não tem achado nem pendência por trás (uma melhoria nova, outro escopo) não vai para o corretor e não vira achado: o comentário não é canal de pedido novo.
 
-Na entrega final, a ação desses PRs é "enviado ao corretor".
+**Quando o achado não vai ao corretor.** O script de triagem manda direto ao dev, com comentário e request changes, o PR cujos achados são todos `nao_corrige_o_ticket` ou `decisao_de_produto`: sem causa confirmada ou sem decisão, o corretor não tem o que mudar. Achado que traz a decisão já tomada (por comentário, acima) não é `decisao_de_produto`: registre a categoria da mudança que falta (`parcial`, `efeito_colateral`…). Se o pedido avisar que a última volta do corretor no PR terminou sem mudança, siga o que ele diz.
+
+Na entrega final, a ação desses PRs é "enviado ao corretor" ou "direto ao dev".
 
 ### Modo portão
 O diretório atual é uma cópia da branch do PR com a mudança do corretor **ainda sem commit** (`git status`, `git diff`; o diff do PR inteiro continua sendo contra o merge-base com o destino). Na pasta indicada estão o `achados.md` e a `resposta.md` do corretor. Não edite código e não toque no Bitbucket.
