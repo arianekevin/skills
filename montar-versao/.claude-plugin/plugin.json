@@ -1,7 +1,7 @@
 {
   "name": "montar-versao",
   "description": "Builds a NectarCRM release: a main version (pom bump on top of alpha, tag vYY.Q.NNN) or a hotfix (vYY.Q.NNN.H) that starts from the latest version or hotfix and cherry-picks only the chosen commits — including fixes made on the PR after review — instead of the whole alpha. Pushes the tag (and the hotfix branch); the main version bump goes to alpha with the tag. Services released alongside get the CRM tag (no pom bump).",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "author": {
     "name": "arianecasas"
   },

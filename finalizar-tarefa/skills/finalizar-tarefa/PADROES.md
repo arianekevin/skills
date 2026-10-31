@@ -68,6 +68,13 @@ de nome — `pkill -f vite` derruba o servidor de desenvolvimento de outro proje
 você nem fica sabendo qual era. Antes de subir serviço, confira se a porta está livre
 e **fixe** a sua; antes de parar um container, confirme que foi você quem o subiu.
 
+**Não reinicie projeto de outro.** Serviço que outra pessoa ou outra sessão subiu (servidor
+de desenvolvimento, backend, banco, fila) não se reinicia, nem para "pegar a mudança":
+se ele precisa reiniciar, diga qual e por quê, e deixe para quem o subiu. Mesma regra
+para os arquivos: outra sessão pode estar commitando na mesma pasta — monte o commit no
+último instante, com pathspec explícito, sem nada esperando no índice, e nunca leve
+junto trecho que não é seu.
+
 ## 4. Saída honesta: declare o travamento em vez de fechar
 
 Toda skill precisa de pelo menos uma saída que não seja sucesso, e ela precisa ser
