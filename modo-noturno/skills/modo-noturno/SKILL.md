@@ -59,10 +59,29 @@ há ninguém para marcar. A pergunta não some: ela é guardada, com as opções
    saída no relatório e não misture a noite com uma base quebrada — ele não saberia o que foi você.
    Siga só com itens que não dependem da parte vermelha.
 4. **Ordem: do menor risco para o maior.** O primeiro item prova o mecanismo (guarda, commit, doc)
-   barato.
+   barato. Itens independentes não esperam na fila: vão em paralelo (**Itens em paralelo**, abaixo).
 5. **Grave o inventário no disco antes do primeiro item**, no doc de pendências, numa seção
    `## Modo noturno <AAAA-MM-DD>`. A conversa pode ser resumida no meio da noite; o disco não.
 6. **Nada decidido?** Não invente trabalho. Uma linha dizendo isso, e pare.
+
+Doc de pendências ambíguo (`references/identificar-doc.md` mandaria perguntar): à noite não há a
+quem. Crie um doc novo com o assunto da noite e diga no relatório qual era a dúvida.
+
+## Itens em paralelo
+
+A noite rende o tamanho da fila, não o de um item. Com dois ou mais itens que não dependem um do
+outro, dispare um subagente por item já ao entrar. Antes, liste os arquivos (e o trecho) de cada um:
+
+- **Arquivos não se cruzam** → paralelo na pasta principal. Os subagentes não commitam: você commita
+  item a item, com a lista exata de arquivos de cada um.
+- **Mesmo arquivo, trechos diferentes** → paralelo, cada um na sua worktree, com dependências
+  instaladas nela. Crie as worktrees uma por vez: várias ao mesmo tempo disputam a criação e falham.
+- **Mesmo trecho ou mesmo comportamento** → um por vez.
+
+Cada subagente no modelo mais leve que dá conta: o mais capaz para decidir desenho e código difícil;
+verificar, testar e usar a tela pelo navegador vão no mais leve. O prompt de cada um leva a régua
+desta skill — decide o pequeno sozinho, devolve o grande como pergunta, não pergunta nada — senão ele
+congela o que você mesma decidiria. Quem integra é você: guarda verde, commit, doc, um item por vez.
 
 ## A régua da decisão
 
@@ -73,7 +92,7 @@ poucos minutos, sem perder nada?**
 `CLAUDE.md` e as memórias dizem), pelo convencional depois. Anote na lista *"decidi sozinha"*: a
 escolha, o porquê em uma frase, e como desfazer. Exemplos: nome de função, formato de mensagem de
 erro, qual de duas bibliotecas já instaladas usar, ordem dos itens, texto de label, como estruturar
-um teste.
+um teste, tamanho de botão, densidade, espaçamento, lista em uma linha ou duas.
 
 **Não → grande impacto: congele.** É grande impacto, sempre:
 
@@ -119,6 +138,11 @@ as opções que existem de fato (investigadas, não genéricas), a sua recomenda
 - **Guarda antes de cada commit:** os testes da área mexida, o build se o projeto tiver. Vermelho que
   você não consegue corrigir sem afrouxar a régua: reverta aquele pedaço, registre a saída colada, e
   siga para o próximo item.
+- **Item com tela só fecha clicado** pelo caminho do usuário — teste de render que clica onde ele
+  clicaria, ou o navegador. API respondendo 200 não prova que existe botão que leve até ela. Clique
+  automático só numa lista do que abre e mostra (abrir, ver, editar, expandir), nunca "tudo menos os
+  verbos perigosos": sempre sobra um "Desligar" ou "Voltar ao padrão" que grava. Anote antes o estado
+  do que pode mudar.
 - **Item de bug começa pelo teste que falha**, pela razão que a causa raiz diz. Falhou por outro
   motivo, ou passou de cara: a causa está errada — congele o item com a saída colada.
 - **Item que revela uma escolha entre dois comportamentos defensáveis** passa pela régua como qualquer
@@ -126,6 +150,11 @@ as opções que existem de fato (investigadas, não genéricas), a sua recomenda
 - **Um commit por item fechado**, com pathspec explícito. Trabalho não commitado que já estava na
   árvore ao entrar é da sessão — siga com ele, mas não faça `stash` nem descarte nada que você não
   escreveu.
+- **Outra sessão pode commitar na mesma pasta.** Nada fica preparado no índice esperando — ela leva
+  junto. Arquivo novo pede `git add` do próprio caminho no mesmo comando do commit (o pathspec não
+  pega arquivo não rastreado); arquivo que outra sessão também mexeu vai só com os seus trechos
+  (`git add -p`, ou patch com contexto — nunca `--unidiff-zero`). Depois, `git status`: nada seu
+  ficou de fora. Número de migration ou ADR: confira o remoto e o não rastreado antes de criar.
 - **Não encoste em processo, porta ou container que não foi você quem subiu** (`PADROES.md`, seção 3).
 - **Atualize o doc ao fechar cada item**: feito, decidido sozinha, congelado. Se você perder o fio,
   `git log` e o doc dizem onde estava.
@@ -142,7 +171,9 @@ Só quando **todo** item do inventário estiver em um destes estados:
   registrado com o que falta e como obter.
 
 Antes de parar, releia o inventário inteiro. Item que dependia de um congelado mas tinha uma parte
-independente: faça a parte independente. Achado no caminho que é trabalho novo, fora do combinado:
+independente: faça a parte independente. Depois, confira cada **feito** contra o pedido de origem —
+de preferência por um subagente verificador, que não escreveu o código, clicando na tela quando
+houver. "Pedi e não foi feito" é o pior achado da manhã. Achado no caminho que é trabalho novo, fora do combinado:
 não faça — vira uma linha no relatório.
 
 Pare também, mais cedo, se **três itens seguidos** falharem — o problema é o ambiente, não os itens —,
@@ -160,7 +191,8 @@ Nos dois lugares, com o mesmo conteúdo:
 
 Formato em **`references/relatorio.md`**. Depois do relatório, as perguntas congeladas vão em
 `AskUserQuestion` (até quatro por chamada, a mais importante primeiro), com a sua recomendação como
-primeira opção — é o que ele vai responder ao acordar.
+primeira opção — é o que ele vai responder ao acordar. Respondida uma leva, chame a próxima, até
+acabarem; não espere ele pedir o resto.
 
 ## Quando ele responder
 
@@ -168,6 +200,7 @@ primeira opção — é o que ele vai responder ao acordar.
   remova a worktree (`git worktree remove`, sem `--force` se houver algo não commitado).
 - **Recusou ou escolheu outra opção:** remova a worktree e a branch, e implemente o que ele escolheu.
 - **Atualize o doc**: pergunta respondida sai de "Perguntas" e vai para "Combinado", com a decisão.
+- **Resposta é combinado:** construa já, em paralelo quando der, sem pedir um "pode ir".
 
 ## Limites inegociáveis
 

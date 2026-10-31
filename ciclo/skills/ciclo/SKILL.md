@@ -1,6 +1,6 @@
 ---
 name: ciclo
-description: "Executa um ciclo iterativo rumo a um objetivo, com orçamento de voltas e critério de parada. Use esta skill quando o dev invocar /ciclo, ou quando pedir para 'iterar', 'rodar em loop', 'tentar N vezes', 'ficar tentando até passar', 'insistir até funcionar', ou quando descrever um objetivo junto de um número de tentativas e um indicador de sucesso. IMPORTANTE: não confundir com a skill loop embutida, que reexecuta um prompt em intervalo de tempo — esta aqui itera rumo a uma meta e para quando o indicador bate."
+description: "Executa um ciclo iterativo rumo a um objetivo, com orçamento de voltas e critério de parada. Use esta skill quando o dev invocar /ciclo, ou quando pedir para 'iterar', 'rodar em loop', 'tentar N vezes', 'faz N ciclos de <melhoria>', 'ficar tentando até passar', 'insistir até funcionar', ou quando descrever um objetivo junto de um número de tentativas e um indicador de sucesso. IMPORTANTE: não confundir com a skill loop embutida, que reexecuta um prompt em intervalo de tempo — esta aqui itera rumo a uma meta e para quando o indicador bate."
 ---
 
 # Ciclo — loop com objetivo
@@ -149,13 +149,10 @@ separada de "aprova?", e não peça aprovação do ajuste depois de aplicá-lo.
 > - "5 (Recomendado)" · "3" · "8"
 
 Quando os três insumos vieram fechados na invocação e a spec não tem eixo ajustável de verdade,
-faça **uma** pergunta só, e siga:
+**não pergunte "pode rodar?"**: a invocação já é a aprovação. Mostre a spec e vá para o baseline —
+ele lê enquanto a volta 1 roda, e interrompe se discordar.
 
-> header: `Spec` · "Pode rodar?"
-> - "Aprovo, roda as 5 voltas (Recomendado)" — começo pelo baseline agora
-> - "Ajustar antes" — me diga o que muda e eu refaço a spec
-
-Se o dev fechar a pergunta sem responder, **não arranque**. Pergunta ignorada não é aprovação.
+Se houve pergunta e o dev a fechou sem responder, **não arranque**. Pergunta ignorada não é aprovação.
 
 ## Indicador composto: rode todos os membros, sempre
 
@@ -219,9 +216,14 @@ Isso não é relaxar nem endurecer o indicador que o dev escolheu — é impedir
 UX" derrube 500 testes sem ninguém ver. Uma guarda vermelha é motivo de desfazer a volta, nunca de
 declará-la um avanço parcial.
 
-**Diga uma vez, e só uma:** num loop subjetivo o indicador mede a *sua avaliação* do código, não a
-experiência. Se você não roda a aplicação, você não viu a tela — o veredito visual é do dev, e o
-relatório final tem que dizer isso em vez de sugerir que ficou provado.
+**"Faz N ciclos de <melhoria>"** (usabilidade, performance, apresentação) é loop subjetivo com
+orçamento N. Os critérios saem do que você mediu antes — a tela usada, o tempo cronometrado, o bundle
+pesado —, não de lista genérica; cada volta fecha um.
+
+**Diga uma vez, e só uma:** num loop subjetivo o indicador mede a *sua avaliação*, não a experiência.
+Se a aplicação está no ar, meça clicando pelo caminho do usuário (teste de render que clica, ou o
+navegador) — clique automático só no que abre e mostra, nunca no que grava. Se não está, você não viu
+a tela: o relatório diz isso como limitação da entrega, não como nota de rodapé.
 
 ## Fase 3 — Baseline
 
@@ -312,15 +314,18 @@ porque pergunta no fim de relatório morre.
 
 ## Limites inegociáveis
 
-- **Não commite** a não ser que o dev peça. Se pedir, commite por pathspec explícito —
-  nunca `git add -A`, nunca `git add .`; há trabalho paralelo não commitado.
-- **Nunca `git push`.** Publicar é decisão do dev, sempre.
+- **Commit e push seguem a regra registrada do repo** (`CLAUDE.md` ou memória — `PADROES.md`,
+  seção 3). Sem regra: não commite sem pedido, e nunca dê push. Commit sempre por pathspec explícito
+  — nunca `git add -A`, nunca `git add .`; há trabalho paralelo não commitado. Arquivo novo pede
+  `git add` do próprio caminho; nada fica preparado no índice esperando, outra sessão na mesma pasta
+  leva junto.
 - **Nunca `git checkout`/`git restore` para desfazer** uma mudança sua num arquivo que já tinha
   trabalho não commitado — isso apaga o trabalho do dev junto. Desfaça editando de volta, ou copie
   o arquivo para o scratchpad antes.
 - **Não edite migration já aplicada**, nem o comentário dela — o checksum derruba o boot.
 - **Não suba a aplicação** (`spring-boot:run`, `pnpm dev`, servidores de longa duração). Prepare o
-  ambiente e pare; quem sobe é o dev.
+  ambiente e pare; quem sobe é o dev. Se ela já está no ar, use-a para medir — sem reiniciar o que
+  não foi você que subiu.
 - **Não relaxe o indicador** para fazê-lo passar: não marque teste como skip, não afrouxe a
   asserção, não troque o comando por um mais fácil. Se o indicador estiver errado, **pare e diga** —
   mudar a régua no meio do loop invalida o loop inteiro.

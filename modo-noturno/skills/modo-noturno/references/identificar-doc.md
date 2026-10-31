@@ -17,7 +17,7 @@ declara o modo "um por tarefa" explicitamente.
 
 **Sem marcador, a leitura.** Leia o `CLAUDE.md` e o `CONTRIBUTING.md`, se houver. Se algum
 deles **manda manter** um arquivo que descreve o presente do trabalho ("leia no início de toda sessão",
-"atualize no mesmo commit") — ex.: `docs/CONTINUIDADE.md` no ndesk — esse é o destino, e as regras de
+"atualize no mesmo commit") — ex.: `docs/CONTINUIDADE.md` — esse é o destino, e as regras de
 manutenção dele valem acima das desta skill. Não crie `docs/pendencias/` nesse repo.
 
 Se a leitura deixar dúvida (o doc existe mas o CLAUDE.md não diz que é para manter), pergunte uma vez
@@ -30,7 +30,14 @@ andamento", decisão em aberto), não um arquivo. O resto do passo 2 vale para a
 
 Um arquivo por tarefa. Nome: slug curto do assunto (`troca-de-senha.md`), não da data nem da branch.
 
-Liste `docs/pendencias/*.md` e leia o cabeçalho de cada um. Para cada candidato, conte os sinais:
+**Procure em todas as worktrees, não só no checkout atual.** O doc é versionado ou local da worktree
+onde a tarefa foi feita, na branch dela; o checkout principal pode nem ter a pasta. Rode
+`git worktree list` e liste `docs/pendencias/*.md` de cada uma (ignore as de subagente e as
+`prunable`). Mesmo `tarefa:` em mais de uma: vale o de `atualizado:` mais recente. Nunca conclua
+"não há trabalho aberto" olhando um checkout só; worktree com mudança não commitada ou commit fora
+de qualquer remota e sem doc é sessão aberta ou fechada sem registro — cite antes de propor tarefa nova.
+
+Leia o cabeçalho de cada candidato. Para cada um, conte os sinais:
 
 | sinal | como medir |
 |---|---|
@@ -45,6 +52,9 @@ Liste `docs/pendencias/*.md` e leia o cabeçalho de cada um. Para cada candidato
 - **Ambíguo:** um sinal só, ou mais de um candidato com sinais. Pergunte, listando os candidatos
   pelo `tarefa:` — nunca escolha sozinho entre dois.
 
+Escreva o doc na worktree da branch da tarefa (`branch:`), não no checkout em que a conversa
+calhou de estar; tarefa sem branch própria fica no checkout em uso.
+
 Nunca edite, mescle ou apague o doc de outra tarefa. Uma sessão que tocou duas tarefas atualiza dois
 docs, cada um com o que é seu.
 
@@ -52,6 +62,13 @@ docs, cada um com o que é seu.
 
 Se a sessão não mexeu em nenhum repo git, ou mexeu em vários, pergunte em qual repo registrar (ou em
 quais). Não escreva em `~` nem em diretório sem git.
+
+## O que não entra no doc
+
+- Comportamento que **já era assim** antes do trabalho (confirmado contra a base): "já era assim"
+  encerra. Não vira pendência, adiado nem decisão — nem para registrar que foi descartado.
+- Nas seções, etapas e itens de roteiro vão **pelo nome** ("populate de uma tabela"), não por número
+  ("2.1"): o número obriga a abrir outro arquivo para saber do que se trata.
 
 ## Formato do doc por tarefa
 
