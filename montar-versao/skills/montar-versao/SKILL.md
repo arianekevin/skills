@@ -1,6 +1,6 @@
 ---
 name: montar-versao
-description: Monta versão do nectarcrm — versão principal (tag na alpha, vYY.T.NNN) ou hotfix (vYY.T.NNN.H), que parte da versão ou hotfix mais recente e leva só os commits escolhidos, não a alpha inteira. Dá push na tag (e na branch do hotfix). Use quando pedirem "monta a versão", "fecha a versão", "gera a tag", "monta um hotfix", "hotfix com o WEB-1234", "leva esse fix pra produção sem a alpha".
+description: Monta versão do nectarcrm — versão principal (tag na alpha, vYY.T.NNN) ou hotfix (vYY.T.NNN.H), que parte da versão ou hotfix mais recente e leva só os commits escolhidos, não a alpha inteira. Dá push na tag (e na branch do hotfix; na principal, também no bump na alpha). Use quando pedirem "monta a versão", "fecha a versão", "gera a tag", "monta um hotfix", "hotfix com o WEB-1234", "leva esse fix pra produção sem a alpha".
 ---
 
 # Montar versão e hotfix (nectarcrm)
@@ -51,6 +51,8 @@ Quando o pedido inclui um serviço (ex.: "gera a versão no crm e no sparknectar
    `REPO=<clone do serviço> montar.sh servico --plano <tag-do-crm>`.
 3. Depois de montar o CRM, rode `montar.sh servico <tag-do-crm>` em cada serviço. A tag
    vai direto na ponta da alpha do serviço, **sem bump**: o bump é só do CRM.
+4. Hotfix de serviço: `REPO=<clone do serviço> montar.sh hotfix ...` (o modo `servico`
+   recusa hotfix). Sem bump de pom; a base é a tag da principal que o serviço já tem.
 
 ## Hotfix
 
@@ -81,6 +83,17 @@ O script dá push na tag (e, no hotfix, na branch `hotfix/<versão>`). Na princi
 commit de bump vai **sempre junto** para a alpha, no mesmo push atômico da tag: sobem
 os dois ou nenhum. Se a alpha andou nesse meio-tempo, o push é recusado e nada sobe;
 rode de novo. "Sobe" no vocabulário do time é pôr num ambiente (beta etc.).
+
+O push na alpha dispara a build; teste unitário vermelho barra o deploy dela. Se o
+deploy não rodar, diga isso em vez de supor falha da skill. Nunca mergeie PR na alpha:
+a skill só empurra o bump.
+
+## Master e insider (só se pedirem)
+
+"Joga a versão na master e na insider": fast-forward de cada uma para o commit da tag
+da **última principal** (hotfix não vai), em cada projeto pedido, pulando branch que
+não existe. Se não for fast-forward, pare e leve a divergência à pessoa: nunca force
+por conta própria, e antes de qualquer force salve o que sairia numa branch de backup.
 
 ## Erros comuns
 
