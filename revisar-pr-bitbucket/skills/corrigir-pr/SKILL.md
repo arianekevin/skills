@@ -39,6 +39,7 @@ Na dúvida entre CORRIGIDO e DECISÃO, é DECISÃO. Corrigir errado custa mais q
 
 - O mínimo que resolve o achado. Sem refatorar, sem renomear, sem "já que estou aqui". Siga o estilo do arquivo.
 - Siga o caminho de chamada do que você mudou: quem mais chama? Outra porta (outra versão da API, tela antiga, ação em massa, importação, job) precisa da mesma mudança ou passa a falhar?
+- Defeito que você notar fora dos achados e que já existia antes do PR não é seu: não corrija e não vire DECISÃO.
 - Não desfaça o que o PR já resolve, nem o que uma volta anterior sua resolveu e o revisor aceitou.
 - Edite só dentro do diretório atual. Nada de `git commit`, `checkout`, `stash`, `reset`, `push`.
 - Sem arquivo novo que não seja necessário para a correção (nada de doc, nada de script solto).

@@ -23,7 +23,8 @@ Achado é o que segura o merge: mergeado como está, o cliente do ticket continu
 O teste: se o dev responder "não vou mexer nisso", você seguraria o merge? Se não, não é achado — não vira ❌ nem ⚠️, não vira comentário, não entra no relatório. Não é achado:
 - caso de borda improvável, robustez que "seria bom ter", exatidão de comportamento auxiliar (desfazer, log, histórico) que continua funcionando;
 - pedido de processo: anexar script ou SQL, registrar data, documentar, provar que rodou, escrever teste;
-- preferência de como resolver, quando o jeito do dev resolve.
+- preferência de como resolver, quando o jeito do dev resolve;
+- o que já era assim antes do PR e o ticket não pede para mudar (confira na base: `git log` do arquivo, `git show <merge-base>:<arquivo>`).
 
 Na dúvida entre achado e preciosismo, é preciosismo.
 
@@ -98,6 +99,7 @@ Quem lê a explicação do autor antes do código tende a confirmar a tese dele 
 - Nova consulta: tem paginação/limite? Roda por linha? Filtra tenant? Concatena valor da request? Segura transação aberta enquanto chama serviço externo?
 - Campo novo mapeado no ORM entra no UPDATE de linha inteira dos fluxos antigos? (Um fluxo que regrava a entidade inteira desfaz o que outro gravou por SQL.)
 - "Quebra" é contra o que o cliente usa hoje (produção, regra de produto), não contra um estado intermediário da branch de destino criado por outro PR ainda não liberado. Antes de chamar de regressão, confira se aquilo já funcionava (`git log` do arquivo).
+- Teste que o PR altera: se ele afirmava exatamente o comportamento que o ticket manda mudar (o bug estava fixado no teste), trocar essa asserção pela do ticket é parte da correção, não `quebra_teste`. É achado o teste apagado, afrouxado ou ignorado, ou a asserção trocada sobre outro comportamento.
 
 Achados mais graves (❌ e brecha de segurança): confira você no código antes de reportar, mesmo quando vieram de um agente.
 
@@ -127,7 +129,7 @@ O que parece faltar pode já estar respondido ou estar em outro PR. Só para PR 
 
 ## Passo 3 — Entregar no chat
 
-Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados (mergeado, recusado, ou revisão ativa e quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados e dependências entre PRs (uma linha cada). Achado anterior ao PR, fora do escopo, só entra se for brecha de segurança ou quebra grave; o resto não é reportado.
+Ordem: ❌ primeiro, depois ⚠️ agrupados (brecha que sobra, quebra, parcial), depois os ✅. Uma a três linhas por ticket. No fim: PRs pulados (mergeado, recusado, ou revisão ativa e quem marcou), tickets sem PR ou com commit direto, empilhadas (ordem de merge), conflitos esperados e dependências entre PRs (uma linha cada). Problema anterior ao PR, fora do escopo, só entra se for brecha de segurança ou quebra grave, como ℹ️ uma linha que não muda o veredito; o resto não é reportado.
 
 Veredito:
 - ❌ não resolve, ou brecha/quebra séria
@@ -246,7 +248,7 @@ Entregue na mesma pasta:
 - **parcial:** a mudança local está boa e pode subir, e o que sobra depende de decisão de dev ou produto — o corretor não tem mais o que fazer.
 - **reprovado:** há achado de pé ou problema na mudança, e o corretor ainda pode agir.
 
-`nao_bloqueia` é o que vai avisado ao dev sem segurar o PR: pendência real que o corretor levantou ou que sobrou de um achado, não foi corrigida e não passa no teste de "O que é achado" (dado antigo que continua como estava, corrida que a mudança reduz mas não elimina, decisão que pode esperar). Uma linha cada, dizendo o que ficou e o que resolveria. Não é lugar de estilo nem de sugestão de melhoria; sem pendência assim, lista vazia. Também não é lugar do processo dos agentes: o que o corretor rodou ou deixou de rodar (lint, suíte, comando de verificação), quantas voltas houve, o que você conferiu. Isso não diz nada ao dev — a suíte completa é rodada à parte, por quem publica. Só entra o que é sobre o código ou o comportamento do sistema.
+`nao_bloqueia` é o que vai avisado ao dev sem segurar o PR: pendência real que o corretor levantou ou que sobrou de um achado, não foi corrigida e não passa no teste de "O que é achado" (dado antigo que continua como estava, quando não é ele que mantém o erro do ticket; corrida que a mudança reduz mas não elimina, decisão que pode esperar). Uma linha cada, dizendo o que ficou e o que resolveria. Não é lugar de estilo nem de sugestão de melhoria; sem pendência assim, lista vazia. Também não é lugar do processo dos agentes: o que o corretor rodou ou deixou de rodar (lint, suíte, comando de verificação), quantas voltas houve, o que você conferiu. Isso não diz nada ao dev — a suíte completa é rodada à parte, por quem publica. Só entra o que é sobre o código ou o comportamento do sistema.
 
 **`achados.md`**, regravado:
 - aprovado: vazio (só o cabeçalho);
