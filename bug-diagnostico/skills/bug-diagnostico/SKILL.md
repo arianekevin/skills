@@ -79,6 +79,8 @@ saídas são diferentes e você precisa saber em qual está:
 Sem esse par, "não achei nada" vira ambíguo e o dev não sabe se fecha o ticket ou se
 insiste.
 
+Ao apontar duplicado, confira que o outro ticket está **vivo**: duplicado de ticket cancelado não é duplicado, o problema continua sem dono.
+
 **Busque por assinatura técnica, não por nome de tela.** Exceção + entidade + método. O mesmo bug aparece em telas diferentes com tickets diferentes.
 
 > Por que primeiro: o mesmo bug costuma já ter passado por outro ticket, com a mesma exceção na mesma entidade e a causa raiz escrita no corpo de um commit — às vezes com o fix pronto em outro serviço. Um `git log -S'<ClasseDaExcecao>'` de 30 segundos encerra o que uma sessão inteira de hipóteses e tentativas de reprodução não encerra.
@@ -99,11 +101,14 @@ insiste.
   - É na Action do Struts? No Form? Na JSP? No controller AngularJS? No service? Na query SQL?
   - Use busca exploratória: "me mostra a Action que trata essa requisição", "quais outros pontos chamam esse método?"
   - Trace o fluxo de dados da entrada (request) até a saída (response/view)
+  - Se o fio levar a outro repositório, siga só até onde ele muda o projeto em foco. Fechada a parte que afeta o projeto, o resto vira uma linha no relatório, não nova investigação
 
 **4. Abrangência — cenários similares**
 - Antes de convergir na causa raiz, sempre pergunte se o bug acontece em cenários similares ou se é específico de um caso
 - Exemplos: "Acontece apenas com campos booleanos ou com qualquer tipo de campo personalizado?", "Isso falha só em oportunidade ou também em contato/tarefa?", "Reproduz só com update ou também com create?"
 - Isso evita diagnosticar um caso particular quando o problema é genérico (ou vice-versa)
+- Procure as **outras portas**: o mesmo defeito em outro endpoint, tela ou serviço que passa pelo mesmo código. Causa achada só na primeira porta deixa o ticket reabrir
+- Confira se o comportamento **já era assim** antes (compare com a versão anterior ou a base da mudança). Se já era, diga isso com a evidência: não é regressão e não entra como bug
 
 **5. Hipóteses**
 - **Se o erro nomeia um objeto concreto — um id, uma linha, uma chave, uma coleção — leia o objeto ANTES de montar hipótese.** Uma exceção que diz `Entidade#2423965531` está entregando a resposta; ler aquele registro responde de primeira o que uma sequência de hipóteses não responde.
@@ -111,6 +116,8 @@ insiste.
 - Para cada hipótese, sugira como verificar: "Se for X, esperamos ver tal coisa no log. Vamos checar?"
 - **Prefira a pergunta que discrimina à experiência que confirma.** Antes de propor um teste, pergunte-se: "se der negativo, o que eu aprendo?" Se a resposta for "só que essa hipótese caiu", provavelmente existe uma medição melhor.
 - Elimine hipóteses uma por uma até convergir na causa raiz
+- **Prove a hipótese no dado de quem sofre o bug.** Reproduzir um defeito real, mas que não é o do cliente, reabre o ticket. Escreva o que precisa ser verdade no ambiente afetado (estado do registro, configuração, volume, tempo da requisição) e confira lá; se a reprodução não bate com o relato, o diagnóstico ainda não fechou. Estado montado por chamada direta, que a tela não permitiria, não prova que o caminho existe para o usuário
+- Erro genérico na tela ("contate o administrador") esconde a exceção real, que só está no log do servidor. Em bug só de frontend não há log: a confirmação é reproduzir, e a falta de log não é motivo para devolver
 - **Ao errar a segunda hipótese do mesmo tipo, pare e troque de método** — meça em vez de adivinhar. E não anuncie fechamento antes da evidência: "achei" dito três vezes antes da hora custa credibilidade.
 
 **6. Confirmação**

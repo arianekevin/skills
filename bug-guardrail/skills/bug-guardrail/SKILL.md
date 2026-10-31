@@ -70,6 +70,7 @@ Pergunte:
 **Não aceite:**
 - Escopo vago como "arrumar o módulo de oportunidades"
 - Escopos amplos demais que misturam fix com refatoração
+- Comportamento que já era assim antes do bug: não entra no escopo, nem como "já que estamos aqui"
 
 **Aceite:**
 - Identificação clara de quais arquivos/métodos/componentes serão alterados
@@ -117,7 +118,8 @@ Pergunte:
 Após o dev aprovar o código, gere testes de regressão:
 - Use os cenários do Gate 2 como base
 - Adicione cenários de borda: nulls, listas vazias, valores limite
-- Os testes devem falhar se o bug for reintroduzido
+- Os testes devem falhar se o bug for reintroduzido: rode-os **antes** da correção e confirme que ficam vermelhos
+- Se a correção quebrar um teste que afirmava exatamente o comportamento errado do ticket, **troque a asserção** pela do comportamento correto, mantendo o teste. Teste quebrado por outro motivo é efeito colateral da sua mudança: conserte a mudança. Nunca apague, afrouxe ou ignore teste
 - Siga o padrão de testes que já existe no projeto (JUnit? TestNG? Jasmine? Karma?)
 
 Pergunte:
@@ -129,6 +131,7 @@ Antes de encerrar, gere a documentação para o QA:
 - Pré-condições para teste
 - Passos de reprodução do cenário original
 - Resultado esperado após a correção
+- O cenário do cliente que reportou, montado pelos caminhos que a tela permite: corrigir um defeito real que não é o dele reabre o ticket
 - Cenários de regressão a verificar
 
 ## Comportamentos bloqueados
