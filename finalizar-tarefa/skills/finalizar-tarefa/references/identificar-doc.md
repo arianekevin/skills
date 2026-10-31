@@ -17,7 +17,7 @@ declara o modo "um por tarefa" explicitamente.
 
 **Sem marcador, a leitura.** Leia o `CLAUDE.md` e o `CONTRIBUTING.md`, se houver. Se algum
 deles **manda manter** um arquivo que descreve o presente do trabalho ("leia no início de toda sessão",
-"atualize no mesmo commit") — ex.: `docs/CONTINUIDADE.md` no ndesk — esse é o destino, e as regras de
+"atualize no mesmo commit") — ex.: `docs/CONTINUIDADE.md` — esse é o destino, e as regras de
 manutenção dele valem acima das desta skill. Não crie `docs/pendencias/` nesse repo.
 
 Se a leitura deixar dúvida (o doc existe mas o CLAUDE.md não diz que é para manter), pergunte uma vez
