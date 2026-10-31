@@ -1,9 +1,9 @@
 ---
 name: alicerce
-description: "Fundação de projeto — especifica o 'passo 0' e documenta, sem implementar nada. Use quando o dev for começar um projeto novo e quiser saber por onde começar e o que precisa existir antes de codar; quando quiser saber o que falta de fundação num projeto que já existe; ou quando for especificar uma coisa nova grande dentro de um projeto existente. Detecta sozinha o caso e produz documentos: o plano, as convenções e as regras de trabalho. NÃO escreve código, não instala nada, não sobe serviço — quem implementa é a skill obra, lendo o que esta aqui especificou. Não é para escrever um ADR avulso nem para trabalho de design system de interface."
+description: "Início de projeto, do passo 0 ao molde provado. Primeiro especifica a fundação em documentos (plano, convenções, regras de trabalho), sem código; depois do ok do dev, levanta a obra: escolhe ferramenta e versão, registra cada escolha em ADR, executa fase por fase com verificação por comando e para quando a feature de referência prova o molde. Use quando o dev for começar um projeto novo, quiser saber o que falta de fundação num projeto que já existe, for especificar uma coisa nova grande dentro de um projeto, ou pedir para 'executar o plano de fundação', 'levantar o projeto', 'montar o esqueleto', 'obra', ou quando existir um docs/PLANO-FUNDACAO.md esperando execução. Não é para escrever um ADR avulso nem para trabalho de design system de interface."
 ---
 
-# Alicerce — especificação de fundação
+# Alicerce — do passo 0 ao molde provado
 
 Produz o **passo 0** de um projeto como **documento**: o que é obrigatório, o que é
 opcional, o que foi adiado de propósito, e onde cada regra é imposta.
@@ -13,15 +13,22 @@ versionada, forma de erro, tokens de design, modelo de permissão, ator na assin
 quem grava, costura de teste — são baratos no dia 1 e caros no dia 90. Escolher errado
 a ordem é o que transforma protótipo em dívida.
 
-O documento que ela escreve é o contrato que a skill **`obra`** executa. Por isso ele
-precisa ser preciso sobre o **requisito** e mudo sobre a **ferramenta**.
+Duas fases, sempre nesta ordem e com uma pausa entre elas:
+
+1. **Especificar** (passos 0 a 5) — escreve o contrato em documentos. Nenhum código.
+2. **Obra** (passo 6) — levanta a fundação lendo o contrato **do disco**, só depois do ok do dev.
+
+O contrato precisa ser preciso sobre o **requisito** e mudo sobre a **ferramenta**: a ferramenta se
+escolhe na obra, com versão conferida na data, e vira ADR.
+
+**Entrada direta na obra:** se já existe `docs/PLANO-FUNDACAO.md` e o dev pediu para levantar, vá
+direto ao passo 6.
 
 ## Regras invioláveis
 
-1. **Não implementa nada.** Nenhum arquivo de código, nenhum `npm install`, nenhum
-   serviço no ar, nenhum comando que altere o projeto. Ela escreve documentos. Se o dev
-   pedir para executar, diga que quem faz isso é a `obra`, lendo este plano.
-2. **Não nomeia ferramenta nem versão.** "Formatter e linter num tool só, rodando em
+1. **Na especificação, não implementa nada.** Nenhum arquivo de código, nenhum
+   `npm install`, nenhum serviço no ar. Implementar é só na obra, depois do ok.
+2. **O plano não nomeia ferramenta nem versão.** "Formatter e linter num tool só, rodando em
    CI" é requisito; "Biome 2.5" é escolha de quem implementa, e vira ADR na hora. Plano
    que cita versão nasce velho — e erra, porque quem não executa não tem como conferir.
 3. **O domínio vem antes de tudo, em texto livre.** Nunca ofereça múltipla escolha para
@@ -109,7 +116,7 @@ Cinco endereços fixos, **sempre presentes**, com seções de título fixo. O ho
 calibra a profundidade do conteúdo, **nunca a existência do arquivo** — se ele puder
 sumir, o dev não sabe o que procurar em outro projeto.
 
-| Arquivo | Você escreve | A `obra` completa |
+| Arquivo | Você escreve na especificação | Você completa na obra |
 |---|---|---|
 | `docs/PLANO-FUNDACAO.md` | tudo, incluindo `## Requisitos para a obra` | desvios e verificação por onda |
 | `CONTRIBUTING.md` | tudo: definition of done, com quem impõe cada regra | — |
@@ -125,19 +132,77 @@ preenche — nunca em branco e nunca inventado.
 Mostre no terminal **só**: os itens obrigatórios, o que foi adiado, os `N/A`, e as
 suposições que você assumiu. O documento tem o resto.
 
-Feche oferecendo a `obra`, **sem arrancar sozinha**:
+Feche oferecendo a obra, **sem arrancar sozinha**:
 
 > "A fundação está especificada. Dá uma olhada nas suposições no topo do plano — corrigir
-> agora custa uma linha, depois custa retrabalho. Quando estiver de acordo, eu chamo a
-> `obra` pra levantar."
+> agora custa uma linha, depois custa retrabalho. Quando estiver de acordo, eu levanto."
 
-Se o dev aceitar, **invoque a skill `obra`**. Se ele corrigir alguma coisa antes,
-reescreva o trecho afetado do plano e ofereça de novo.
+Se o dev aceitar, siga para o **passo 6**. Se ele corrigir alguma coisa antes,
+reescreva o trecho afetado do plano e ofereça de novo. Nos modos AUDITORIA e FEATURE,
+a obra é a mesma: executa o plano ou o doc da feature que você escreveu.
 
 A pausa aqui não é cerimônia: é o único momento em que corrigir uma suposição errada
 ainda é barato. Numa execução real, o dev leu o resumo e trocou o projeto de
 desktop-first para mobile-first na mensagem seguinte — encadear automático teria
 levantado a fase inteira errada.
+
+## Passo 6 — a obra: levantar a fundação
+
+Executa as fases do plano e para quando **o molde está provado**. Aqui você escolhe a
+ferramenta — **e a escolha vira ADR**.
+
+**Sem plano, sem obra.** Se não existir `docs/PLANO-FUNDACAO.md` (ou o doc da feature),
+volte ao passo 0. Levantar fundação sem contrato é como se constrói o que ninguém
+consegue explicar depois.
+
+### Regras da obra
+
+1. **Você decide ferramenta, nunca requisito.** Requisito que não está no plano não
+   entra: pergunte, ou volte e reescreva o plano. Escopo que cresce sozinho é o modo
+   mais comum de a fundação virar projeto.
+2. **Não encoste em nada fora do projeto.** Mate pelo PID que você guardou, **nunca por
+   padrão de nome** — `pkill -f vite` derruba o servidor de outro projeto. Confira a
+   porta antes e **fixe** a sua; não pare container que não foi você quem subiu.
+3. **Ferramenta que resiste duas vezes tem o padrão dela adotado.** Aceite o default,
+   registre como desvio e siga. Tooling de fase 1 não pode virar o projeto.
+4. **Verifique a própria escrita.** Edição por âncora falha em silêncio quando o arquivo
+   mudou desde que você o leu. Confirme que aplicou antes de seguir.
+5. **Não commite sem pedido**, e nunca com `git add -A` às cegas. Sem `push` nunca.
+
+### Fluxo
+
+1. **Ler o contrato do disco** — mesmo que você o tenha escrito nesta conversa: o dev
+   pode ter corrigido depois de ler. A seção `## Requisitos para a obra` traz, por item,
+   fase, requisito, onde é imposto e **critério de pronto por comando** — é o seu ponto
+   de parada; não invente outro. Não implemente o **adiado**, nem o `N/A`.
+2. **Escolher as ferramentas** que o plano deixou abertas, com
+   `references/obra-decisoes.md`: versão e compatibilidade conferidas na data, não de
+   memória; prefira o que o dono do projeto já usa. Um ADR por escolha.
+3. **Executar fase por fase** com `references/obra-execucao.md`. Cada fase fecha com a
+   tabela de verificação preenchida no plano.
+4. **Parar no critério de saída:** a fundação está pronta quando a segunda feature sai
+   do molde sem pergunta. Você entrega a primeira, a de referência. Ao fim, pergunte
+   honestamente: *"Quem copiasse `{caminho do molde}` precisaria decidir algo que não
+   está escrito?"* Se sim, o que falta é convenção no `CLAUDE.md`, não código.
+
+### O que você completa nos documentos
+
+| Documento | O que você completa |
+|---|---|
+| `docs/PLANO-FUNDACAO.md` | verificação por fase e tabela de desvios |
+| `README.md` | a seção **Rodar** — os comandos reais, testados do zero |
+| `CLAUDE.md` | **Comandos**, **Armadilhas já encontradas aqui**, nome da feature de referência |
+| `docs/adr/` | um ADR por escolha de ferramenta ou versão |
+
+A seção de armadilhas é a mais valiosa e a mais esquecida: cada uma custou tempo uma
+vez, e escrever ali é o que impede a segunda.
+
+### Saída honesta da obra
+
+Requisito que não pode ser cumprido — dependência que não existe, ambiente que não sobe,
+critério que não passa —: **pare e diga**. Não marque como feito, não afrouxe o
+critério. Entregue até onde chegou, o que falta e o que tentou; "não verificado" é
+resposta legítima, "feito" sem comando que prove não é.
 
 ## Adaptação ao contexto
 
@@ -159,4 +224,6 @@ confirmado o mesmo dono, convenção existente vence escolha ótima.
 - `references/modo-novo.md` — os dois caminhos e como montar a especificação
 - `references/modo-auditoria.md` — como levantar o que existe e priorizar as lacunas
 - `references/modo-feature.md` — coisa nova dentro de projeto que já existe
+- `references/obra-execucao.md` — como executar uma fase e fechá-la com verificação
+- `references/obra-decisoes.md` — como escolher ferramenta e versão, e escrever o ADR
 - `assets/` — modelos dos cinco documentos

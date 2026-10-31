@@ -1,7 +1,7 @@
 {
   "name": "skills",
-  "version": "2.13.0",
-  "description": "Skills for Claude Code: a foundation planner and the builder that executes it, an iterative loop with a stopping rule, the bug diagnosis/fix pair used on NectarCRM, and the session handoff pair: close a session with a resumable record, finish a task and retire it, and a Bitbucket pull request reviewer that applies its verdict, and a release builder that assembles main versions and cherry-picked hotfixes, and a night mode that carries the session's agreed work alone and saves the big decisions for the morning.",
+  "version": "2.14.0",
+  "description": "Skills for Claude Code: a foundation planner that also raises what it planned, an iterative loop with a stopping rule, the bug diagnosis/fix pair used on NectarCRM, and the session handoff pair: close a session with a resumable record, finish a task and retire it, and a Bitbucket pull request reviewer that applies its verdict, and a release builder that assembles main versions and cherry-picked hotfixes, and a night mode that carries the session's agreed work alone and saves the big decisions for the morning.",
   "owner": {
     "name": "arianecasas"
   },
@@ -9,12 +9,7 @@
     {
       "name": "alicerce",
       "source": "./alicerce",
-      "description": "Plans the step zero of a new project, or audits an existing one against a foundation rubric."
-    },
-    {
-      "name": "obra",
-      "source": "./obra",
-      "description": "Raises the foundation from the plan the alicerce wrote, and stops when the mould is proven."
+      "description": "Plans the step zero of a project (or audits an existing one), then raises the foundation and stops when the mould is proven."
     },
     {
       "name": "ciclo",

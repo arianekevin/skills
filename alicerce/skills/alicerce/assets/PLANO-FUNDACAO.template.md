@@ -1,6 +1,6 @@
 # Plano de Fundação — {NOME DO PROJETO}
 
-_Especificado em {DATA} pela skill `alicerce`. Quem implementa é a `obra`, lendo a
+_Especificado em {DATA} pela skill `alicerce`. Quem implementa é a obra, lendo a
 seção **Requisitos para a obra**. Este documento não nomeia ferramenta nem versão:
 essas escolhas são da obra e viram ADR em `docs/adr/`._
 
@@ -40,7 +40,7 @@ _Assumido, não perguntado. Corrigir aqui é mais barato que ter respondido._
 
 ## Requisitos para a obra
 
-_Esta é a seção que a skill `obra` executa. Cada item traz o requisito (nunca a
+_Esta é a seção que a obra executa. Cada item traz o requisito (nunca a
 ferramenta), quem impõe a regra, e o critério de pronto verificável por comando._
 
 ### Obrigatório
@@ -108,7 +108,7 @@ Registrar em `docs/adr/`, formato em `docs/adr/0000-template.md`.
 ---
 
 ## Verificação por fase
-_Preenchido pela `obra`. Cada linha traz o comando que provou. O que não foi rodado
+_Preenchido pela obra. Cada linha traz o comando que provou. O que não foi rodado
 entra como **não verificado**, nunca como feito._
 
 ### Fase 1
@@ -126,7 +126,7 @@ entra como **não verificado**, nunca como feito._
 ---
 
 ## Desvios do plano
-_Preenchido pela `obra`. Onde a realidade contrariou a especificação, e o que ficou no
+_Preenchido pela obra. Onde a realidade contrariou a especificação, e o que ficou no
 lugar. Documento vivo: plano que só descreve o dia 1 vira ficção na primeira semana._
 
 | Fase | O plano exigia | O que aconteceu | O que ficou no lugar |

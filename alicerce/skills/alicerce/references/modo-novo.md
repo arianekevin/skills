@@ -1,10 +1,10 @@
 # Modo NOVO — especificar a fundação
 
-Objetivo: produzir os cinco documentos do contrato, com uma seção que a `obra` consiga
+Objetivo: produzir os cinco documentos do contrato, com uma seção que a obra consiga
 executar sem tomar decisão estrutural nem perguntar a cada passo.
 
 Você não escreve código. Se der vontade de criar um arquivo de configuração, pare: o
-que você tem a fazer é **descrever o requisito** com precisão suficiente para a `obra`
+que você tem a fazer é **descrever o requisito** com precisão suficiente para a obra
 criá-lo sozinha.
 
 ## 1. O domínio já está na mão
@@ -95,7 +95,7 @@ e classifique **cada item** em um balde:
   puder checar a divergência
 - **Não se aplica** — escrito, nunca omitido
 
-As **fases** continuam existindo, como ordem de execução para a `obra`:
+As **fases** continuam existindo, como ordem de execução para a obra:
 
 - **Fase 1 — esqueleto.** Repo, tooling, config, estrutura de teste com o teste que
   exercita a stack de verdade. Zero feature
@@ -122,7 +122,7 @@ Escreva no plano, com estas palavras:
 A primeira feature — a de referência — não é fundação nem é trabalho normal: é a
 **prova de que o molde funciona**. Enquanto ninguém a copiou, o molde é hipótese.
 
-Isso dá à `obra` um ponto de parada verificável e diz ao dev o que esperar: se a segunda
+Isso dá à obra um ponto de parada verificável e diz ao dev o que esperar: se a segunda
 feature ainda exigir decisão estrutural, a fundação não terminou — falta convenção
 escrita, ou o molde não era molde.
 
@@ -130,7 +130,7 @@ escrita, ou o molde não era molde.
 
 Modelos em `assets/`. Regras que valem para todos:
 
-- **Requisito, nunca ferramenta ou versão.** A escolha é da `obra` e vira ADR lá
+- **Requisito, nunca ferramenta ou versão.** A escolha é da obra e vira ADR lá
 - **O que ficar pendente vai escrito como pendente**, dizendo quem preenche
 - **Cada regra declara quem a impõe** — inclusive "acordo", quando for o caso
 

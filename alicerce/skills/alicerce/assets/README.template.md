@@ -5,7 +5,7 @@ produto interno.}
 
 ## Rodar
 
-_{Preenchido pela `obra`. Meta: três comandos, e seguir daqui do zero funciona.}_
+_{Preenchido pela obra. Meta: três comandos, e seguir daqui do zero funciona.}_
 
 ## Documentos
 

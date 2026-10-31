@@ -10,7 +10,7 @@ Cada item entra na especificação com quatro coisas:
    de propósito (com o gatilho de revisita)
 3. **Onde é imposto** — banco, tipo, lint, CI, hook, ou *acordo*. Regra que não declara
    quem a impõe é desejo; escrever "imposta por: acordo" é honesto, esconder não é
-4. **Critério de pronto verificável por comando** — a `obra` precisa saber que acabou
+4. **Critério de pronto verificável por comando** — a obra precisa saber que acabou
    sem perguntar. "README claro" não serve; "seguir o README do zero e a app sobe" serve
 
 Prioridades: **P0** barato agora e caro depois · **P1** primeira semana · **P2** aditivo.
@@ -50,10 +50,10 @@ O **não-escopo** é o mais negligenciado e o que mais economiza retrabalho.
 | Item | Pri | Onde é imposto |
 |---|---|---|
 | As decisões que a conversa tomou, uma por arquivo | P0 | acordo |
-| Template para as próximas, inclusive as que a `obra` vai tomar | P0 | acordo |
+| Template para as próximas, inclusive as que a obra vai tomar | P0 | acordo |
 
 Formato: *contexto / decisão / consequências / alternativas descartadas*. Escolha de
-ferramenta e versão **não** é decisão desta skill — é da `obra`, e vira ADR lá.
+ferramenta e versão **não** é decisão desta skill — é da obra, e vira ADR lá.
 
 ## 3. Repo, tooling & CI
 

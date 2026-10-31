@@ -1,7 +1,7 @@
 # Modo AUDITORIA — o que existe contra o que deveria existir
 
 Objetivo: `docs/DIAGNOSTICO-FUNDACAO.md`, com as lacunas priorizadas e um plano que a
-`obra` — ou o dev — consiga executar. Você não corrige nada aqui.
+obra — ou o dev — consiga executar. Você não corrige nada aqui.
 
 ## 1. Levantar o terreno
 

@@ -5,8 +5,7 @@ instale só o que faz sentido na máquina.
 
 | Plugin | O que faz | Escopo |
 |---|---|---|
-| **alicerce** | Especifica o passo 0 de um projeto novo, audita a fundação de um já existente, ou desenha uma feature dentro dele | genérico |
-| **obra** | Levanta a fundação a partir do plano que a alicerce escreveu | genérico |
+| **alicerce** | Especifica o passo 0 de um projeto novo, audita a fundação de um já existente, ou desenha uma feature dentro dele — e, com o seu ok, levanta a obra até o molde provado | genérico |
 | **ciclo** | Loop iterativo com objetivo, indicador de sucesso e orçamento de voltas | genérico |
 | **modo-noturno** | Toca sozinho o trabalho combinado da sessão enquanto você dorme; decide o pequeno e guarda o grande para a manhã. De dia, guarda o que fica para a noite | genérico |
 | **fechar-sessao** | Registra onde a sessão parou — feito, combinado, adiado, próximo passo — para a próxima retomar | genérico |
@@ -21,7 +20,6 @@ instale só o que faz sentido na máquina.
 ```
 /plugin marketplace add arianekevin/skills
 /plugin install alicerce@skills
-/plugin install obra@skills
 /plugin install ciclo@skills
 /plugin install modo-noturno@skills
 /plugin install fechar-sessao@skills
@@ -56,8 +54,10 @@ script** — nunca as cópias. O mesmo vale para `compartilhado/identificar-doc.
 
 ## alicerce
 
-A especificação que deveria existir antes da primeira linha de código. **Ela não implementa nada** —
-escreve documentos. Quem levanta o projeto é a `obra`, lendo o que a alicerce especificou.
+A especificação que deveria existir antes da primeira linha de código — e, depois do seu ok, a obra
+que a levanta. São duas fases com uma pausa no meio: especificar (só documentos) e levantar (lendo o
+plano do disco, escolhendo ferramenta e versão, um ADR por escolha, verificação por comando em cada
+fase, até a feature de referência provar o molde). Absorveu o antigo plugin `obra`.
 
 ```
 /alicerce quero fazer um software financeiro com IA e integrações com grandes bancos
@@ -118,15 +118,15 @@ As famílias de domínio trazem a procedência marcada: 🔬 quando vieram de c�
 quem viveu, 📚 quando são conhecimento geral não conferido. A diferença de qualidade entre as duas é
 grande, e quem lê precisa saber o quanto confiar em cada linha.
 
-Ao terminar ela **oferece** a `obra` e espera — não arranca sozinha. A pausa não é cerimônia: o plano
+Ao terminar a especificação ela **oferece** a obra e espera — não arranca sozinha. A pausa não é cerimônia: o plano
 sai com uma seção de suposições porque corrigir lendo é mais barato que ter respondido, e é o único
 momento em que a correção ainda custa uma linha. Numa execução real o dev leu o resumo e trocou o
 projeto de desktop-first para mobile-first na mensagem seguinte; encadeamento automático teria
 levantado a fase inteira errada.
 
-**Limites:** não escreve código, não instala nada, não sobe serviço, não toca em porta ou container.
-Todos os problemas que uma auditoria encontrou na versão anterior vinham da execução; ela não executa
-mais.
+**Limites:** na especificação, não escreve código, não instala nada, não sobe serviço. Na obra, não
+decide requisito, não encosta em processo, porta ou container que não subiu, não commita sem pedido e
+nunca dá push.
 
 ## ciclo
 

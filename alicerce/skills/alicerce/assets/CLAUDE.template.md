@@ -9,7 +9,7 @@ também**.
 
 ## Comandos
 
-_{Preenchido pela `obra`, que é quem sabe os comandos reais.}_
+_{Preenchido pela obra, que é quem sabe os comandos reais.}_
 
 ## Regras que não se quebram
 
@@ -25,7 +25,7 @@ _Cada uma é cara de retrofitar. A coluna da direita é o que separa regra de de
 
 **Eixo de organização:** {por domínio/feature, ou outro — e a forma de `src/`}
 **Regra de dependência:** {ex.: domínio não importa HTTP nem banco}
-**Feature de referência:** _{nomeada pela `obra` na Fase 2}_ — copie o molde dela.
+**Feature de referência:** _{nomeada pela obra na Fase 2}_ — copie o molde dela.
 
 ## Traço de uma requisição
 
