@@ -1,6 +1,6 @@
 ---
 name: modo-noturno
-description: "Toca sozinha o trabalho da sessão enquanto o dev dorme: faz tudo que já está decidido sem interromper, decide o que é pequeno pelo padrão sensato e anota, e congela o que é de grande impacto como pergunta para a manhã — implementando a opção recomendada numa branch à parte quando é seguro. Só para quando não sobra nada que dê para fazer sozinha, e deixa o relatório no chat e no doc de pendências da tarefa. Use quando o dev pedir 'modo noturno', 'entra em modo noturno', 'vou dormir, toca aí', 'faz tudo que conseguir sem mim', 'vou sair, segue sozinha'. NÃO use para rodar os itens prontos da pauta (docs/melhorias/pronto/) — isso é a skill turno."
+description: "Toca sozinha o trabalho da sessão enquanto o dev dorme: faz tudo que já está decidido sem interromper, decide o que é pequeno pelo padrão sensato e anota, e congela o que é de grande impacto como pergunta para a manhã — implementando a opção recomendada numa branch à parte quando é seguro. Só para quando não sobra nada que dê para fazer sozinha, e deixa o relatório no chat e no doc de pendências da tarefa. Use quando o dev pedir 'modo noturno', 'entra em modo noturno', 'vou dormir, toca aí', 'faz tudo que conseguir sem mim', 'vou sair, segue sozinha', 'roda a pauta', 'executa as melhorias'. Também use de dia, quando ele pedir para deixar algo para a noite: 'anota pra rodar à noite', 'põe na pauta', 'deixa pra noite', 'o que tem pra noite'."
 ---
 
 # Modo noturno
@@ -20,8 +20,23 @@ Duas falhas opostas, e as duas custam a noite:
 
 A régua entre as duas está em **A régua da decisão**, abaixo. Tudo o mais serve a ela.
 
-Diferença para a `turno`: a `turno` executa itens já escritos e preparados pela `pauta`, e não decide
-nada. Esta continua um trabalho aberto, com decisões dentro — e decide as pequenas.
+## De dia: deixar para a noite
+
+Quando ele diz de passagem "anota pra rodar à noite" ou "põe na pauta", **não execute agora**. Escreva
+um item na seção `## Para a noite` do doc de pendências da tarefa (`references/identificar-doc.md`):
+
+- o que fazer, em uma frase no indicativo ("todo texto explicativo de formulário vira `<Tooltip>`");
+- **o precedente ou a causa raiz**, com caminho e linha conferidos na fonte — sem isso, a noite vai
+  inventar padrão sozinha;
+- **o critério de pronto**, um comando, com o resultado medido agora (`grep … | wc -l → 14`);
+- o escopo, se não for óbvio.
+
+Investigue você (`grep`, leitura); não pergunte o que o código responde. Mostre o item em três
+linhas e volte ao que ele estava fazendo. "O que tem pra noite": liste a seção, com o que falta em
+cada item incompleto.
+
+Bug só entra com causa raiz confirmada e reprodução determinística. Bug que mexe em dado, cobrança,
+permissão, autenticação ou contrato de API não fica para a noite: é trabalho de dia, com ele.
 
 ## Padrões comuns
 
@@ -36,11 +51,18 @@ há ninguém para marcar. A pergunta não some: ela é guardada, com as opções
 1. **Uma linha de confirmação, e comece.** Não pergunte nada — ele já saiu. Ex.: *"Modo noturno:
    5 itens decididos, começo pelo teste do importador."*
 2. **Inventário do que está decidido.** Fontes, nesta ordem: a conversa da sessão, o doc de pendências
-   da tarefa (`references/identificar-doc.md`), o plano ou ADR que a sessão seguia. Liste em itens
+   da tarefa (`references/identificar-doc.md`) — inclusive a seção `## Para a noite` —, o plano ou ADR
+   que a sessão seguia, e os itens de `docs/melhorias/pronto/` se o repo tiver essa pasta (formato
+   antigo; ao fechar, mova o arquivo para `feito/` ou `bloqueado/`). Liste em itens
    numerados, cada um com o critério de pronto (o comando que passa, a tela que abre).
-3. **Grave o inventário no disco antes do primeiro item**, no doc de pendências, numa seção
+3. **A base está verde?** Rode os testes e o build do projeto antes de mexer. Já vermelho: registre a
+   saída no relatório e não misture a noite com uma base quebrada — ele não saberia o que foi você.
+   Siga só com itens que não dependem da parte vermelha.
+4. **Ordem: do menor risco para o maior.** O primeiro item prova o mecanismo (guarda, commit, doc)
+   barato.
+5. **Grave o inventário no disco antes do primeiro item**, no doc de pendências, numa seção
    `## Modo noturno <AAAA-MM-DD>`. A conversa pode ser resumida no meio da noite; o disco não.
-4. **Nada decidido?** Não invente trabalho. Uma linha dizendo isso, e pare.
+6. **Nada decidido?** Não invente trabalho. Uma linha dizendo isso, e pare.
 
 ## A régua da decisão
 
@@ -97,6 +119,10 @@ as opções que existem de fato (investigadas, não genéricas), a sua recomenda
 - **Guarda antes de cada commit:** os testes da área mexida, o build se o projeto tiver. Vermelho que
   você não consegue corrigir sem afrouxar a régua: reverta aquele pedaço, registre a saída colada, e
   siga para o próximo item.
+- **Item de bug começa pelo teste que falha**, pela razão que a causa raiz diz. Falhou por outro
+  motivo, ou passou de cara: a causa está errada — congele o item com a saída colada.
+- **Item que revela uma escolha entre dois comportamentos defensáveis** passa pela régua como qualquer
+  outra decisão, mesmo que tenha vindo "pronto" de dia.
 - **Um commit por item fechado**, com pathspec explícito. Trabalho não commitado que já estava na
   árvore ao entrar é da sessão — siga com ele, mas não faça `stash` nem descarte nada que você não
   escreveu.
@@ -119,7 +145,8 @@ Antes de parar, releia o inventário inteiro. Item que dependia de um congelado 
 independente: faça a parte independente. Achado no caminho que é trabalho novo, fora do combinado:
 não faça — vira uma linha no relatório.
 
-Pare também, mais cedo, se a base ficar vermelha e você não conseguir voltar ao verde revertendo o
+Pare também, mais cedo, se **três itens seguidos** falharem — o problema é o ambiente, não os itens —,
+ou se a base ficar vermelha e você não conseguir voltar ao verde revertendo o
 que fez. Um repositório quebrado de manhã é o pior desfecho possível.
 
 ## O relatório da manhã
