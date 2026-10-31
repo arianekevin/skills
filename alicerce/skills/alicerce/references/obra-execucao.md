@@ -22,6 +22,7 @@ depois, quando o outro projeto não sobe.
 - **Nunca** `pkill -f <nome>`, `killall`, nem `docker stop` em container que não é seu
 - **Fixe a porta** com a opção estrita da ferramenta, para falhar alto em vez de migrar
   em silêncio — porta que muda sozinha vira README errado
+- Em worktree, `npm ci` (ou equivalente) próprio: **nunca symlink de `node_modules`** para o checkout principal — `git worktree remove --force` apaga o que está do outro lado
 - Serviço que você subiu para testar, você derruba antes de terminar
 
 ## Ordem dentro da fase
@@ -30,6 +31,8 @@ depois, quando o outro projeto não sobe.
 2. **Rode o critério de pronto** que o plano definiu para ele
 3. Se passou, registre na tabela de verificação com o comando e o resultado
 4. Se não passou, conserte ou registre como desvio — nunca siga em silêncio
+
+**Tela só está pronta se alguém chega nela.** Rota respondendo 200 não prova nada: escreva um teste de render que clique onde o usuário clicaria (ou percorra no navegador) e confira que cada componente novo tem quem o aciona. Se não deu para abrir no navegador, diga na entrega como limitação, não como nota de rodapé.
 
 Não empilhe cinco itens e teste no fim: quando quebrar, você não sabe qual foi.
 

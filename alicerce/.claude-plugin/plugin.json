@@ -1,7 +1,7 @@
 {
   "name": "alicerce",
-  "description": "Project foundation planner. Detects on its own whether the repository is a fresh start or an existing project: for a fresh start it asks at most five calibrating questions and writes an executable step-zero plan; for an existing one it audits what is there against a rubric of eight areas and proposes an implementation plan ordered by how fast each gap gets more expensive. Writes documents, never code. Then, after the dev's ok, raises the foundation from that plan (absorbs the old obra plugin): picks tools and versions, records each as an ADR, verifies every phase by command and stops when the mould is proven.",
-  "version": "2.6.0",
+  "description": "Project foundation planner. Detects on its own whether the repository is a fresh start or an existing project: for a fresh start it asks at most five calibrating questions and writes an executable step-zero plan; for an existing one it audits what is there against a rubric of eight areas and proposes an implementation plan ordered by how fast each gap gets more expensive. In the specification phase it writes documents, never code. Then, after the dev's ok, raises the foundation from that plan (absorbs the old obra plugin): picks tools and versions, records each as an ADR, verifies every phase by command and stops when the mould is proven.",
+  "version": "2.7.0",
   "author": {
     "name": "arianecasas"
   },

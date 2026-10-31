@@ -52,6 +52,8 @@ O **não-escopo** é o mais negligenciado e o que mais economiza retrabalho.
 | As decisões que a conversa tomou, uma por arquivo | P0 | acordo |
 | Template para as próximas, inclusive as que a obra vai tomar | P0 | acordo |
 
+Número de ADR (e de migration) se confere no remoto antes de criar: com mais de uma sessão ou pessoa na mesma branch, o "próximo número" colide. Faça `fetch`, pegue o maior do remoto + 1, e renumere se ele andou antes do push.
+
 Formato: *contexto / decisão / consequências / alternativas descartadas*. Escolha de
 ferramenta e versão **não** é decisão desta skill — é da obra, e vira ADR lá.
 
@@ -62,6 +64,7 @@ ferramenta e versão **não** é decisão desta skill — é da obra, e vira ADR
 | Formatter e linter, num tool só se possível | P0 | lint |
 | Typecheck estrito, se a linguagem tiver | P0 | typecheck |
 | `.gitignore`, `.editorconfig`, segredo fora do repo | P0 | lint / revisão |
+| Branch principal `main` em repo novo (`git init -b main`), nunca o padrão `master` | P0 | acordo |
 | Convenção de commit | P1 | hook ou CI |
 | **CI rodando teste, lint e typecheck** | opcional | CI |
 
@@ -76,6 +79,8 @@ resposta, e registre no `CONTRIBUTING.md` qual é o caso.
 | Um eixo de organização declarado, sem mistura | P0 | revisão |
 | Regra de dependência entre camadas | P0 | teste de arquitetura, ou acordo |
 | **Feature de referência nomeada** — o molde que todos copiam | P0 | acordo |
+
+**Configurável pelo cliente, padrão semeado:** o que o negócio varia (listas, regras, rótulos, limites) mora em dado editável, com o valor inicial semeado; no código fica só o que o sistema usa por nome estável. **Integração externa = núcleo genérico + adaptador:** o núcleo não conhece o fornecedor; o primeiro é só o primeiro adaptador. Trocar depois custa um adaptador, não uma reescrita.
 
 Preferir pasta **por domínio/feature** a pasta por tipo técnico. A feature de referência
 é o entregável mais valioso: escolha a mais fina que ainda atravesse todas as camadas
@@ -123,6 +128,8 @@ o que é fácil de acrescentar nasce quando tiver dono.
 O caro não são os valores dos tokens — é a **disciplina de referência**. Se a escala
 existe no dia 1, o componente nº 1 usa; se não existe, ele escreve `12px` e quarenta
 componentes depois não há escala pra migrar de volta. Trocar valor depois é barato.
+
+**O design system é vivo:** decisão de estilo (tamanho, densidade, cor, padrão de tela) atualiza o documento dele **no mesmo commit** da mudança, e a regra velha que a nova substitui sai. Doc só acrescido acaba com cinco regras contraditórias. Ao fim de uma leva de mudanças visuais, faça uma passada de coerência.
 
 Semântico vs. literal é a diferença entre tema escuro ser troca de valores ou reescrita.
 

@@ -3,7 +3,7 @@
 Objetivo: produzir os cinco documentos do contrato, com uma seção que a obra consiga
 executar sem tomar decisão estrutural nem perguntar a cada passo.
 
-Você não escreve código. Se der vontade de criar um arquivo de configuração, pare: o
+Nesta fase você não escreve código (a obra, passo 6, vem depois do ok). Se der vontade de criar um arquivo de configuração, pare: o
 que você tem a fazer é **descrever o requisito** com precisão suficiente para a obra
 criá-lo sozinha.
 

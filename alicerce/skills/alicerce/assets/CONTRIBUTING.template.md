@@ -50,7 +50,8 @@ equivalente é comportamento documentado."}
 ## Commits e revisão
 
 **Commits:** {convenção}
-**Branches:** {}
+**Branches:** {a principal chama-se `main` em repo novo}
+**Sessões paralelas:** {mais de uma pessoa ou sessão na mesma branch: `fetch` antes de criar migration ou ADR, número = maior do remoto + 1}
 **Revisão:** {o que o revisor precisa conseguir responder}
 
 ## Antes de propor mudança estrutural
