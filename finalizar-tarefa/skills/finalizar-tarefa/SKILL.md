@@ -41,8 +41,9 @@ Do repo, medido agora:
 git status --short                          # código não commitado
 git log origin/<branch>..HEAD --oneline     # commits não empurrados
 git branch --list                           # branches da tarefa (ex.: parked/*)
+git worktree list                           # worktree da tarefa com trabalho sem commit ou sem remota
 ```
-Cruze com o `escopo:` do doc: mudança não commitada fora do escopo não é desta tarefa — não conte.
+O doc e o trabalho podem estar em outra worktree que não a atual: meça lá (`git -C <worktree> status`). Cruze com o `escopo:` do doc: mudança não commitada fora do escopo, ou de outra sessão na mesma pasta, não é desta tarefa — não conte.
 
 ## Passo 3 — Apontar e confirmar
 
@@ -70,6 +71,7 @@ O modo é o que a `fechar-sessao` gravou: `git config --local --get pendencias.m
 Commitando, doc por tarefa:
 ```bash
 git rm docs/pendencias/<tarefa>.md
+git commit -m "..." -- docs/pendencias/<tarefa>.md   # só o doc; nada preparado no índice (pasta pode ser compartilhada)
 # se a pasta ficou vazia, o git já não a rastreia
 ```
 Mensagem (convenção do repo se houver; senão):

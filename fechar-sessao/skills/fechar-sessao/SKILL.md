@@ -20,6 +20,8 @@ explícito, e saída honesta em vez de fechamento sem evidência.
 Siga `references/identificar-doc.md`. Resumo:
 - Repo com doc de continuidade obrigatório (o CLAUDE.md manda manter) → é nele, pelas regras dele.
 - Senão → `docs/pendencias/<tarefa>.md`, um por tarefa.
+- Procure o doc em **todas as worktrees** (`git worktree list`): ele vive na branch da tarefa, e o
+  checkout atual pode não ter nenhum. Escreva-o na worktree dessa branch.
 - Decida se um doc existente **pertence** a esta tarefa pelos sinais (tarefa nomeada, branch, escopo,
   continuidade). Ambíguo → uma pergunta. Nenhum → cria novo.
 
@@ -33,8 +35,12 @@ Do repo, medido agora:
 git status --short                 # não commitado
 git log origin/<branch>..HEAD --oneline   # não empurrado (se houver remoto)
 git branch --list                  # branches locais criadas na sessão
+git worktree list                  # worktrees da tarefa, com mudança ou commit sem remota
 git log --since=<atualizado:> --oneline   # o que a sessão commitou
 ```
+Pasta compartilhada com outra sessão: `git status` mostra também o trabalho dela. Registre em
+"Estado do ambiente" só o que é desta tarefa e diga que há mudança alheia — não a descreva como sua.
+
 E o ambiente de que o trabalho depende (serviços que precisam estar no ar, como subir) — só se mudou
 ou se a próxima sessão vai tropeçar nele.
 
@@ -47,7 +53,9 @@ Regras:
 3. **Item resolvido muda de seção, não some.** De "Próximo passo" para "Feito"; de "Adiado" para
    "Combinado" se foi decidido de vez.
 4. Datas absolutas (`2026-09-28`), nunca "hoje" ou "amanhã".
-5. "Onde paramos" no topo: 2–4 linhas que bastam para começar. O primeiro passo concreto ao voltar,
+5. O que **já era assim** antes do trabalho não vira pendência, adiado nem decisão.
+6. Etapas e itens de roteiro pelo nome, não pelo número.
+7. "Onde paramos" no topo: 2–4 linhas que bastam para começar. O primeiro passo concreto ao voltar,
    incluindo o que depende da pessoa (push esperando ok, decisão pendente).
 
 Doc por tarefa: atualize `atualizado:` e o `escopo:` se cresceu. Doc do repo: siga o formato dele.
@@ -77,7 +85,8 @@ pedindo. Daí em diante, siga o modo gravado sem perguntar.
 
 **Modo `compartilhado`:**
 - Tire `docs/pendencias/` do `.git/info/exclude`, se estiver lá.
-- Commit só com o doc (e nada mais), na convenção de mensagem do repo. Sem convenção:
+- Commit só com o doc (e nada mais), montado e commitado no mesmo comando — `git commit -- <doc>`,
+  sem deixar nada preparado no índice (outra sessão na mesma pasta pode commitá-lo por engano). Na convenção de mensagem do repo. Sem convenção:
   `docs(pendencias): <tarefa> — onde paramos em AAAA-MM-DD`.
 - Push: se o repo tem autorização registrada (memória ou CLAUDE.md), suba; senão, o commit sobe no
   próximo push do projeto — não peça push só por causa do doc.
