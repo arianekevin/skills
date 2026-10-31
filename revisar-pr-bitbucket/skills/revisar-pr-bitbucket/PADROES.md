@@ -75,6 +75,13 @@ para os arquivos: outra sessão pode estar commitando na mesma pasta — monte o
 último instante, com pathspec explícito, sem nada esperando no índice, e nunca leve
 junto trecho que não é seu.
 
+**Não deixe lixo seu para trás.** Worktree que você criou e cujo trabalho terminou —
+integrado, descartado ou aprovado — sai na hora: `git worktree remove <caminho>`, sem
+`--force`; se ela recusar por algo não commitado, não force, diga o que ficou. Branch
+sua mergeada na principal (por rebase, squash ou fast-forward) se apaga: a local sempre;
+a remota só se foi você que a criou e o repositório tem push autorizado. Serviço,
+processo ou container que você subiu, você derruba antes de terminar.
+
 ## 4. Saída honesta: declare o travamento em vez de fechar
 
 Toda skill precisa de pelo menos uma saída que não seja sucesso, e ela precisa ser
