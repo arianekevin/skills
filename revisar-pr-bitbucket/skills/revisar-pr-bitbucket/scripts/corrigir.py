@@ -18,9 +18,11 @@ na fila. Sem argumento ele esvazia a fila, um PR por vez, e sai. Um lock própri
 O que faz, por PR na fila ($REVISOR_DIR/trabalho/correcao/<pr>/ com achados.md e marca.json,
 deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
   1. Cria uma cópia da branch (git worktree) em $CORRETOR_DIR/pr-<pr>. Se a branch está atrás do
-     destino, traz o destino para ela (merge, sem force-push depois): sem conflito, o merge já sai
-     commitado; com conflito, resolver é trabalho do corretor, conferido pelo revisor. O merge só sobe
-     junto com outra mudança ou com o conflito resolvido.
+     destino, traz o destino para ela (merge na cópia): sem conflito, o merge já sai commitado; com
+     conflito, resolver é trabalho do corretor, conferido pelo revisor. Isso só sobe junto com outra
+     mudança ou com o conflito resolvido, e sobe como rebase: a branch é refeita em cima do destino num
+     commit só, com o autor do PR, e vai com push --force-with-lease (um merge do destino na branch volta
+     a conflitar no rebase do validador e do merge).
   2. Até $CORRETOR_VOLTAS voltas: o corretor (skill corrigir-pr) mexe na cópia e responde achado
      por achado; o revisor, em modo portão, confere a mudança e a resposta e dá o veredito.
   3. Publica conforme o veredito. Quem comenta é sempre o revisor, num comentário só; o corretor só dá push:
@@ -28,8 +30,8 @@ deixados pela triagem — `cron.py` com $CORRETOR_CLAUDE definido):
                o comentário lista também o que ficou de fora sem bloquear
      parcial   commit + push + comentário (o corrigido e o que ficou para o dev) + request changes
      sem acordo ao fim das voltas: descarta a mudança; comentário com os achados + request changes
-  O commit vai em cima da branch, sem force-push. Se a branch andou no meio, nada é publicado e o
-  PR volta para a triagem. PR que veio só pelo conflito com o destino (a triagem não o revisou) e
+  Sem o destino trazido, o commit vai em cima da branch, sem force-push. Se a branch andou no meio, nada
+  é publicado e o PR volta para a triagem. PR que veio só pelo conflito com o destino (a triagem não o revisou) e
   foi resolvido: só o push, sem marca nem comentário; com o commit novo ele volta para a revisão.
 
 Ambiente (além do que cron.py já usa):
@@ -159,6 +161,33 @@ def bring(tree, dest):
         return "conflito"
     git("merge", "--abort", cwd=tree)
     return None
+
+
+def linear(tree, dest, head, pr, name, email):
+    """Refaz a cópia em cima do destino (o mesmo que foi trazido): um commit só, com o conteúdo final dela (o
+    trabalho do PR, o conflito resolvido e a correção). Autor: o do último commit do PR; quem commita: o
+    corretor. Devolve o hash novo, ou None se não deu."""
+    # a alpha exata que foi trazida (segundo pai do merge), não a origin/<dest> de agora, que pode ter andado:
+    # com outra base, o commit desfaria o que entrou nela depois
+    merge = git("rev-list", "--merges", "--ancestry-path", f"{head}..HEAD", cwd=tree)[1].splitlines()
+    if not merge:
+        return None
+    base = git("rev-parse", f"{merge[-1]}^2", cwd=tree)[1]
+    own = git("log", "--no-merges", "--format=%s", f"{base}..{head}", cwd=tree)[1].splitlines()
+    who = git("log", "-1", "--no-merges", "--format=%an%x00%ae%x00%aI", head, cwd=tree)[1].split("\0")
+    if len(who) != 3:
+        return None
+    lines = [own[-1] if own else f"PR #{pr}", "",
+             f"Refeito em cima da {dest} pelo corretor (rebase num commit só, conflito resolvido) a partir de {head}."]
+    if len(own) > 1:
+        lines += ["", "Commits do PR:", *(f"- {x}" for x in reversed(own))]
+    env = {**os.environ, "GIT_AUTHOR_NAME": who[0], "GIT_AUTHOR_EMAIL": who[1], "GIT_AUTHOR_DATE": who[2],
+           "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email}
+    r = subprocess.run(["git", "commit-tree", "HEAD^{tree}", "-p", base, "-F", "-"], cwd=tree, env=env,
+                       input="\n".join(lines) + "\n", capture_output=True, text=True)
+    if r.returncode != 0 or git("reset", "-q", "--soft", r.stdout.strip(), cwd=tree)[0] != 0:
+        return None
+    return r.stdout.strip()
 
 
 def baseline(ref, logs):
@@ -413,6 +442,9 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unre
         if rc != 0:
             log(f"#{pr}: commit falhou, nada publicado: {out[:200]}")
             return
+        if merged and not linear(tree, dest, head, pr, name, email):
+            log(f"#{pr}: não consegui refazer a branch em cima da {dest}; nada publicado")
+            return
         commit = git("rev-parse", "--short=12", "HEAD", cwd=tree)[1]
 
     # o que o corretor diz (o que mudou) e o que o revisor diz (o que ficou para o dev)
@@ -424,7 +456,8 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unre
     if notes:
         (mine if commit else theirs).append("ℹ️ **Ficou de fora, não bloqueia:**\n" + "\n".join(f"- {x}" for x in notes))
     if commit:
-        mine.append("Puxe a branch antes de continuar (`git pull --rebase`).")
+        mine.append(f"A branch foi refeita em cima da `{dest}` (rebase): antes de continuar, traga com `git pull --rebase`."
+                    if merged else "Puxe a branch antes de continuar (`git pull --rebase`).")
     # uma voz só no PR: quem comenta é o revisor, que acionou o corretor e conferiu a mudança; o corretor só dá push.
     # O que foi corrigido fica também num arquivo à parte, para quem acionou a rodada (o validador) citar.
     if mine:
@@ -450,12 +483,14 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unre
         if git("rev-parse", "--short=12", f"origin/{branch}")[1] != head:
             log(f"#{pr}: a branch andou durante a correção; nada publicado, volta para a triagem")
             return
+        # branch refeita em cima do destino: força, mas só se ela ainda está onde o corretor leu
+        lease = [f"--force-with-lease=refs/heads/{branch}:{git('rev-parse', head, cwd=tree)[1]}"] if merged else []
         if FIXER_TOKEN:  # o token vem do ambiente pelo helper, não entra na linha de comando
             helper = "!f() { echo username=x-token-auth; echo \"password=$CORRETOR_BITBUCKET_TOKEN\"; }; f"
-            rc, out = git("-c", "credential.helper=", "-c", f"credential.helper={helper}", "push",
+            rc, out = git("-c", "credential.helper=", "-c", f"credential.helper={helper}", "push", *lease,
                           f"https://bitbucket.org/{bitbucket.resolve_repo(None)}.git", f"HEAD:refs/heads/{branch}", cwd=tree)
         else:
-            rc, out = git("push", "origin", f"HEAD:refs/heads/{branch}", cwd=tree)
+            rc, out = git("push", *lease, "origin", f"HEAD:refs/heads/{branch}", cwd=tree)
         if rc != 0:
             log(f"#{pr}: push falhou, nada publicado: {out[:200]}")
             return
