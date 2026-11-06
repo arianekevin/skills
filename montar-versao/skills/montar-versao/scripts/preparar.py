@@ -248,11 +248,13 @@ def outros(a, mat, gravar, tem_valor=True):
     feitos = []
     for t in plano:
         titulo = titulo_outros(t["secoes"])
-        linhas = [f"Ajustes da {a.versao} sem ticket próprio na versão. O que pode ter sido impactado:", ""]
+        linhas = [f"Ajustes da {a.versao} sem ticket próprio na versão. O que testar:", ""]
         for x in t["secoes"]:
             linhas += [f"**{x['nome']}**"]
             for it in x["itens"]:
-                ref = sorted({i for sha in it["commits"] for i in re.findall(r"\b([A-Z]{2,5}-\d+)\b", por_sha[sha]["assunto"])})
+                # Só o primeiro ID do assunto: os seguintes costumam ser contexto ("desde a DEL-432").
+                ref = sorted({m.group(1) for sha in it["commits"]
+                              for m in [re.search(r"\b([A-Z]{2,5}-\d+)\b", por_sha[sha]["assunto"])] if m})
                 linhas.append(f"- {it['testar']}" + (f" ({', '.join(ref)})" if ref else ""))
             linhas.append("")
         desc = "\n".join(linhas).rstrip() + "\n"
