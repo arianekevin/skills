@@ -1,9 +1,9 @@
 ---
 name: montar-versao
-description: Monta versão do nectarcrm — versão principal (tag na alpha, vYY.T.NNN) ou hotfix (vYY.T.NNN.H), que parte da versão ou hotfix mais recente e leva só os commits escolhidos, não a alpha inteira. Dá push na tag (e na branch do hotfix; na principal, também no bump na alpha). Use quando pedirem "monta a versão", "fecha a versão", "gera a tag", "monta um hotfix", "hotfix com o WEB-1234", "leva esse fix pra produção sem a alpha".
+description: Prepara e monta versão do nectarcrm — o preparo da próxima versão de bugfix (bump do pom na alpha, versão no campo Versão do YouTrack, tickets aptos do backend nela e ticket de versão para o Hugo), a versão principal (tag na alpha, vYY.T.NNN) ou hotfix (vYY.T.NNN.H), que parte da versão ou hotfix mais recente e leva só os commits escolhidos, não a alpha inteira. Dá push na tag (e na branch do hotfix; na principal, também no bump na alpha). Use quando pedirem "prepara a próxima bugfix", "prepara a próxima versão", "abre a versão da semana", "monta a versão", "fecha a versão", "gera a tag", "monta um hotfix", "hotfix com o WEB-1234", "leva esse fix pra produção sem a alpha".
 ---
 
-# Montar versão e hotfix (nectarcrm)
+# Preparar e montar versão, e hotfix (nectarcrm)
 
 Tudo entra na alpha primeiro. A versão principal é o commit de bump do pom em cima da
 ponta da alpha, com a tag.
@@ -20,6 +20,7 @@ repositório: invocar esta skill é o pedido para dar push **na tag** (e na bran
 hotfix) que ela montar, e no commit de bump da principal na alpha — em mais nada.
 
 ```
+montar.sh preparar  [--plano]                          # próxima principal: bump + YouTrack
 montar.sh principal [--plano]                          # sempre da ponta da origin/alpha
 montar.sh hotfix    [--plano] [--base vYY.T.NNN] <commit>...
 montar.sh servico   [--plano] <tag-do-crm>             # no clone do serviço
@@ -34,13 +35,74 @@ montar.sh servico   [--plano] <tag-do-crm>             # no clone do serviço
 - Serviço que sobe junto (sparknectarbi etc.): a tag é **sempre a do CRM**, mesmo que a
   sequência do serviço pule números. Nunca calcule número próprio para o serviço.
 
+## Preparar a próxima versão de bugfix
+
+A versão de bugfix sobe na segunda. O preparo deixa tudo pronto na semana anterior. Invocar
+este modo é o pedido para o push do bump na alpha e para escrever no YouTrack: valor novo no
+campo Versão, o campo Versão dos tickets e o ticket de versão.
+
+1. `montar.sh preparar --plano` e mostre o que ele imprime:
+   - número da próxima principal;
+   - bump do pom;
+   - tickets que entram, com o motivo de cada um: commit ou PR e em qual projeto;
+   - tickets que ficam fora;
+   - serviços que entram;
+   - descrição do ticket de versão.
+2. **Resolva o que vier `A CONFIRMAR` perguntando a quem acionou a skill** (escolha para
+   marcar). Na dúvida, pergunte, não decida:
+   - Projeto com ticket apto que não está em `~/.claude/montar-versao/projetos.conf`:
+     pergunte se ele sobe na versão de bugfix de segunda. Registre a resposta no arquivo
+     (`<slug> entra <rótulo>` ou `<slug> fora`) e rode o plano de novo.
+   - Ticket que já tem versão de outra linha no campo (ex.: `vue26.4.005`): trocar apaga a
+     dela. Se for trocar, use `TROCAR="IN-1 IN-2" montar.sh preparar`.
+3. `montar.sh preparar` faz, nesta ordem:
+   - commit `chore: bump versao para <versão>` no pom, sobre a ponta da alpha, e push
+     (só fast-forward);
+   - cria o valor `<versão>` no campo Versão do YouTrack (bundle compartilhado);
+   - põe a versão nos tickets que entram;
+   - cria no PID o ticket "Versão - DD/MM" (DD/MM = próxima segunda), com Type Rotina,
+     Responsável Hugo Freitas, Projeto "Release e CI/CD", Prioridade Urgente e o campo
+     Versão.
+
+   Rodar de novo é seguro. Bump feito não se refaz, e ticket que já está na versão fica
+   como está. O ticket de versão é atualizado, não duplicado.
+
+**Quais tickets entram.** WEB e IN em "Apto para teste" com commit no ramo de teste do
+projeto que a última versão dele não tem, ou com PR aberto para esse ramo. O ramo de teste
+é `alpha`, ou `homolog` quando o projeto não tem alpha (ex.: for-whats). Os projetos vêm:
+- dos clones locais do workspace (irmãos do nectarcrm);
+- dos links do Bitbucket citados nos próprios tickets, já que o token não lista o workspace.
+
+Projeto sem clone só é lido pelos PRs e pela citação.
+
+O nectarcrm sempre entra. Os outros projetos seguem o `projetos.conf`:
+- `entra`: o ticket entra na versão, e o projeto ganha a linha `Imagem do serviço <rótulo>:
+  <versão>` no ticket de versão. Na montagem, o projeto recebe a tag do CRM
+  (`montar.sh servico`).
+- `fora`: projeto que não sobe na segunda, como o reloaded, cujo Vue sobe à parte. O
+  ticket só dele fica fora.
+
+**Descrição do ticket de versão.** No preparo, a Insider sai com o crm e os serviços na
+versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sobrescrita.
+
 ## Versão principal
 
 1. `montar.sh principal --plano` e mostre: número, ponta da alpha, quantos commits
    desde a anterior.
 2. `montar.sh principal` cria, num worktree temporário, o commit
    `chore: bump versao para <versão>` no pom sobre a ponta da alpha e a tag nele.
-   Dá push na tag e no bump na alpha, juntos (ver Publicar).
+   Dá push na tag e no bump na alpha, juntos (ver Publicar). Se o preparo já fez o bump
+   (o pom da ponta já está na versão), não há commit novo: a tag vai na ponta.
+3. Em seguida, o script refaz a varredura do preparo no YouTrack com `--montagem`:
+   - põe na versão os tickets que ficaram aptos durante a semana;
+   - preenche a linha App do ticket de versão com a versão que está no insider (a mais
+     recente da principal anterior, com hotfix).
+
+   Vue continua "a definir": não há onde ler essa tag. Se sair `A CONFIRMAR` (saída 5),
+   a tag já subiu. Resolva como no preparo e rode só o YouTrack:
+   `REPO=<clone> python3 scripts/preparar.py --versao <versão> --montagem`.
+   `SEM_YOUTRACK=1` pula esse passo.
+4. Monte os serviços que o ticket de versão lista na Insider (ver abaixo).
 
 ## Serviço que sobe junto
 
@@ -100,3 +162,6 @@ por conta própria, e antes de qualquer force salve o que sairia numa branch de 
 - Tag ou branch já existe → alguém montou antes; `git fetch --tags` e releia.
 - `refname ... is ambiguous` → há branch com nome de tag; o script usa `refs/tags/`.
 - Pedido de hotfix com commit que não está na alpha → recuse e explique.
+- `HTTP 400 ... isn't used for the Versão field` → busca pela versão antes de o valor
+  existir; o script já evita, então releia se mudou a consulta.
+- Saída 5 → há projeto ou ticket a confirmar; nada foi gravado no YouTrack.

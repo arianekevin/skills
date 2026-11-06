@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # montar.sh — monta versão principal ou hotfix do nectarcrm e dá push na tag.
 #
+#   montar.sh preparar  [--plano]
 #   montar.sh principal [--plano]
 #   montar.sh hotfix    [--plano] [--base <tag>] <commit>...
 #   montar.sh servico   [--plano] <tag-do-crm>
 #
+# Preparar: calcula a próxima principal, faz o bump do pom na alpha (push, sem tag) e chama
+# preparar.py: valor no campo Versão do YouTrack, tickets aptos do backend e ticket de versão.
 # Principal: commit "chore: bump versao" no pom sobre a ponta da origin/alpha, com a tag;
-# sobe a tag e o bump na alpha juntos.
+# sobe a tag e o bump na alpha juntos. Se o preparo já fez o bump, só põe a tag na ponta.
+# Depois, preparar.py --montagem acerta tickets e ticket de versão.
 # Hotfix: parte da versão mais recente (principal ou hotfix; com --base vYY.T.NNN, a mais
 # recente daquela principal), cria hotfix/<nova> num worktree em .claude/worktrees/,
 # aplica só os commits pedidos (cherry-pick -x, na ordem em que entraram na alpha) e põe
@@ -14,7 +18,8 @@
 # Serviço (rodado no clone do serviço que sobe junto com o CRM): põe a tag do CRM na
 # ponta da origin/alpha do serviço, sem bump. O número é sempre o do CRM, mesmo pulando.
 #
-# Saída: 0 ok · 2 uso/validação · 3 conflito no cherry-pick (nada fica criado).
+# Saída: 0 ok · 2 uso/validação · 3 conflito no cherry-pick (nada fica criado) ·
+#        4 falha de API do YouTrack/Bitbucket · 5 projeto ou ticket a confirmar (nada gravado no YouTrack).
 set -euo pipefail
 
 REPO=${REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
@@ -52,19 +57,61 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+AQUI=$(cd "$(dirname "$0")" && pwd)
+
+proxima_principal() {
+  local p ultima n
+  p=$(periodo)
+  ultima=$(versoes | grep -E "$RE_PRINCIPAL" | grep -F "$p." | tail -1 || true)
+  if [ -n "$ultima" ]; then n=$((10#${ultima##*.} + 1)); else n=1; fi
+  printf '%s.%03d' "$p" "$n"
+}
+
+# Versão do artefato no pom de um commit.
+versao_no_pom() {
+  git show "$1:$POM" | perl -0ne "print \$1 if m{<artifactId>$ARTIFACT</artifactId>\s*<version>([^<]+)}"
+}
+
 case $modo in
+preparar)
+  [ ${#args[@]} -eq 0 ] || erro "o preparo sai sempre da ponta da $ALPHA"
+  nova=$(proxima_principal)
+  existe_tag "$nova" && erro "tag $nova já existe"
+  versao_pom=${nova#v}
+  alvo=$(git rev-parse "$ALPHA^{commit}")
+  echo "Próxima versão:   $nova"
+  if [ "$(versao_no_pom "$alvo")" = "$versao_pom" ]; then
+    echo "Pom na $ALPHA:    já em $versao_pom (bump feito)"
+  else
+    echo "Bump do pom:      $(versao_no_pom "$alvo") → $versao_pom sobre $(git log -1 --format='%h %s' "$alvo")"
+    if [ $plano = 0 ]; then
+      wt="$REPO/.claude/worktrees/preparar-$nova"
+      [ -e "$wt" ] && erro "worktree já existe: $wt"
+      git worktree add -q --detach "$wt" "$alvo"
+      perl -0pi -e "s{(<artifactId>$ARTIFACT</artifactId>\s*<version>)[^<]+}{\${1}$versao_pom}" "$wt/$POM"
+      if git -C "$wt" diff --quiet -- "$POM"; then
+        git worktree remove --force "$wt"; erro "não achei a versão do $ARTIFACT no $POM"
+      fi
+      git -C "$wt" commit -q -m "chore: bump versao para $versao_pom" -- "$POM"
+      bump=$(git -C "$wt" rev-parse HEAD)
+      git worktree remove "$wt"
+      # Só fast-forward: se a alpha andou, o push é recusado e nada sobe.
+      git push -q origin "$bump:refs/heads/${ALPHA#origin/}" \
+        || erro "push recusado (a ${ALPHA#origin/} andou?); nada subiu. Rode de novo"
+      git fetch -q origin
+      echo "Bump na ${ALPHA#origin/}:   $(git log -1 --format='%h %s' "$bump")"
+    fi
+  fi
+  echo
+  pl=(); [ $plano = 1 ] && pl=(--plano)
+  REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" ${pl[@]+"${pl[@]}"} ${TROCAR:+--trocar $TROCAR}
+  ;;
+
 principal)
   [ ${#args[@]} -eq 0 ] || erro "a principal sai sempre da ponta da $ALPHA (o bump vai em cima dela)"
   alvo=$(git rev-parse "$ALPHA^{commit}")
 
-  p=$(periodo)
-  ultima=$(versoes | grep -E "$RE_PRINCIPAL" | grep -F "$p." | tail -1 || true)
-  if [ -n "$ultima" ]; then
-    n=$((10#${ultima##*.} + 1))
-  else
-    n=1
-  fi
-  nova=$(printf '%s.%03d' "$p" "$n")
+  nova=$(proxima_principal)
   existe_tag "$nova" && erro "tag $nova já existe"
 
   anterior=$(versoes | grep -E "$RE_PRINCIPAL" | tail -1 || true)
@@ -75,19 +122,28 @@ principal)
       || erro "$ALPHA não contém a versão anterior $anterior"
     echo "Desde $anterior:   $(git rev-list --count "refs/tags/$anterior..$alvo") commits"
   fi
+  versao_pom=${nova#v}
+  ja_tem_bump=0
+  [ "$(versao_no_pom "$alvo")" = "$versao_pom" ] && ja_tem_bump=1
+  if [ $ja_tem_bump = 1 ]; then
+    echo "Pom:              já em $versao_pom (preparo fez o bump); a tag vai na ponta"
+  fi
   [ $plano = 1 ] && { echo "(plano: nada criado)"; exit 0; }
 
-  wt="$REPO/.claude/worktrees/versao-$nova"
-  [ -e "$wt" ] && erro "worktree já existe: $wt"
-  git worktree add -q --detach "$wt" "$alvo"
-  versao_pom=${nova#v}
-  perl -0pi -e "s{(<artifactId>$ARTIFACT</artifactId>\s*<version>)[^<]+}{\${1}$versao_pom}" "$wt/$POM"
-  if git -C "$wt" diff --quiet -- "$POM"; then
-    git worktree remove --force "$wt"; erro "não achei a versão do $ARTIFACT no $POM"
+  if [ $ja_tem_bump = 1 ]; then
+    git tag "$nova" "$alvo"
+  else
+    wt="$REPO/.claude/worktrees/versao-$nova"
+    [ -e "$wt" ] && erro "worktree já existe: $wt"
+    git worktree add -q --detach "$wt" "$alvo"
+    perl -0pi -e "s{(<artifactId>$ARTIFACT</artifactId>\s*<version>)[^<]+}{\${1}$versao_pom}" "$wt/$POM"
+    if git -C "$wt" diff --quiet -- "$POM"; then
+      git worktree remove --force "$wt"; erro "não achei a versão do $ARTIFACT no $POM"
+    fi
+    git -C "$wt" commit -q -m "chore: bump versao para $versao_pom" -- "$POM"
+    git -C "$wt" tag "$nova"
+    git worktree remove "$wt"
   fi
-  git -C "$wt" commit -q -m "chore: bump versao para $versao_pom" -- "$POM"
-  git -C "$wt" tag "$nova"
-  git worktree remove "$wt"
 
   # Tag e bump na alpha juntos: --atomic sobe os dois ou nenhum (alpha andou → recusa).
   if ! git push -q --atomic origin "refs/tags/$nova" "refs/tags/$nova^{commit}:refs/heads/${ALPHA#origin/}"; then
@@ -95,6 +151,8 @@ principal)
     erro "push recusado (a ${ALPHA#origin/} andou?); nada subiu. Rode de novo"
   fi
   echo "Pronto: tag $nova e ${ALPHA#origin/} no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
+  # YouTrack: tickets que ficaram aptos na semana e a linha App do ticket de versão.
+  [ -n "${SEM_YOUTRACK:-}" ] || { echo; REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" --montagem ${TROCAR:+--trocar $TROCAR}; }
   ;;
 
 hotfix)

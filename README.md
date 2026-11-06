@@ -13,7 +13,7 @@ instale só o que faz sentido na máquina.
 | **bug-diagnostico** | Investigação de bug até a causa raiz, sem gerar correção | NectarCRM (Struts + AngularJS) |
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
 | **revisar-pr-bitbucket** | Revisa PRs do Bitbucket em três perguntas — resolve, quebra, abre brecha — e aplica: comentário + request changes, ou aprovação | genérico (Bitbucket + YouTrack) |
-| **montar-versao** | Monta a versão principal ou um hotfix só com os commits escolhidos, põe a tag e dá push nela | NectarCRM (padrões trocáveis por variável) |
+| **montar-versao** | Prepara a próxima versão de bugfix no YouTrack (bump, tickets aptos, ticket de versão) e monta a versão principal ou um hotfix só com os commits escolhidos, com tag e push | NectarCRM (padrões trocáveis por variável) |
 
 ## Instalação
 
@@ -316,8 +316,19 @@ quando o plugin atualiza.
 
 Versão e hotfix sem levar a alpha inteira. Tudo entra na alpha primeiro; daí:
 
+- **Preparar a próxima versão de bugfix** (`montar.sh preparar`): bump do pom na alpha. No
+  YouTrack, a skill:
+  - cria a versão no campo Versão;
+  - põe nela os tickets WEB/IN aptos para teste que têm commit ou PR aberto no ramo de teste
+    (alpha ou homolog) de um projeto que sobe na segunda;
+  - abre o ticket de versão para a infra, datado na próxima segunda.
+
+  Projeto ou ticket em dúvida trava a gravação até quem acionou confirmar.
+
 - **Versão principal** `vYY.T.NNN` (T = trimestre, NNN recomeça a cada trimestre): commit de bump
   do pom em cima da ponta da alpha, com a tag. Dá push na tag e no bump na alpha, juntos (atômico).
+  Se o preparo já fez o bump, a tag vai na ponta. Em seguida, a skill acerta no YouTrack os tickets
+  que ficaram aptos na semana e a linha App do ticket de versão.
 - **Hotfix** `vYY.T.NNN.H`: parte da versão ou hotfix mais recente (ou de uma principal escolhida),
   cria `hotfix/<versão>` num worktree e aplica por cherry-pick só os commits pedidos, na ordem em que
   entraram na alpha. Não mexe no pom. Dá push na branch e na tag.
@@ -330,7 +341,9 @@ desfaz tudo e aponta os commits da alpha que mexem nos mesmos arquivos, candidat
 - **Serviço que sobe junto** (`montar.sh servico <tag-do-crm>`): a tag é sempre a do CRM, mesmo
   pulando números na sequência do serviço. Vai na ponta da alpha do serviço, sem bump.
 
-**Precisa de:** clone com `origin` e permissão de push de tag. Padrões do NectarCRM trocáveis por
+**Precisa de:** clone com `origin` e permissão de push de tag. O preparo usa também
+`YOUTRACK_API_TOKEN` com escrita e o token do Bitbucket (PRs). A lista de projetos fica em
+`~/.claude/montar-versao/projetos.conf`. Padrões do NectarCRM trocáveis por
 `ALPHA`, `POM` e `ARTIFACT`.
 
 ---
