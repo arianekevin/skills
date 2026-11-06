@@ -12,6 +12,12 @@
    Com --montagem, a linha "App" sai com a versão que está no insider hoje (a mais recente
    da principal anterior, com hotfix).
 
+4. --outros-material imprime em JSON os commits da versão sem ticket nela (LAT, DEL, sem
+   ticket...). --outros <json> recebe o agrupamento em seções que o agente faz e cria ou
+   atualiza no WEB os tickets "Outros ajustes - <seções>", em "Apto para teste". Ticket que
+   junta seções vai até $OUTROS_LIMITE itens (8). --manter <IDs>: ticket com Versão de outra
+   linha fica nela e sai desta.
+
 --plano mostra tudo e não grava nada. Rodar de novo é seguro: o que já está feito fica.
 
 Ambiente: $YOUTRACK_API_TOKEN (escrita), $BITBUCKET_EMAIL + $BITBUCKET_API_TOKEN (ou
@@ -27,6 +33,7 @@ PROJETOS = ("WEB", "IN")
 ESTADO = "Apto para teste"
 CAMPO = "Versão"
 PID = {"Type": "Rotina", "Projeto": "Release e CI/CD", "Priority": "1 - Urgente"}
+OUTROS_LIMITE = int(os.environ.get("OUTROS_LIMITE", "8"))  # itens num ticket que junta seções
 RESPONSAVEL = os.environ.get("PREPARAR_RESPONSAVEL", "Hugo_Freitas")
 RE_VERSAO = re.compile(r"^v\d{2}\.[1-4]\.\d{3}$")
 RE_BACKEND = re.compile(r"^v\d{2}\.[1-4]\.\d{3}(\.\d+)?$")  # o que a troca automática pode sobrescrever
@@ -174,6 +181,109 @@ def ids_em_prs(repo_slug):
     return achados
 
 
+def commits_da_versao(repo, base, fim):
+    """Commits (sem merge e sem bump) de base..fim: [{sha, assunto, corpo, arquivos}]."""
+    saida = git(repo, "log", "--no-merges", f"refs/tags/{base}..{fim}" if base else fim, "--since=90 days ago",
+                "--format=%x1e%h%x1f%s%x1f%b%x1f", "--name-only")
+    commits = []
+    for bloco in saida.split("\x1e")[1:]:
+        sha, assunto, corpo, arquivos = bloco.split("\x1f")
+        if assunto.startswith("chore: bump versao"):
+            continue
+        commits.append({"sha": sha, "assunto": assunto, "corpo": corpo.strip(),
+                        "arquivos": [l for l in arquivos.split("\n") if l.strip()]})
+    return commits
+
+
+def material_outros(crm, crm_slug, clones, servicos, versao, entram):
+    """Commits da versão que não pertencem a nenhum ticket dela: a matéria dos "Outros ajustes"."""
+    mat = []
+    for s in [crm_slug] + servicos:
+        repo = clones[s]
+        tag = f"refs/tags/{versao}"
+        fim = tag if s == crm_slug and subprocess.run(
+            ["git", "-C", repo, "rev-parse", "-q", "--verify", tag], capture_output=True).returncode == 0 \
+            else ramo_de_teste(repo)
+        base = ultima_principal(repo, antes_de=versao)
+        for c in commits_da_versao(repo, base, fim):
+            ids = set(re.findall(r"\b((?:%s)-\d+)\b" % "|".join(PROJETOS), f"{c['assunto']} {c['corpo']}".upper()))
+            if ids & set(entram):  # cita um ticket da versão: o teste é o dele
+                continue
+            mat.append({"repo": s, "sha": c["sha"], "assunto": c["assunto"], "arquivos": c["arquivos"][:20]})
+    return mat
+
+
+def titulo_outros(secoes):
+    nomes = [x["nome"] for x in secoes]
+    return "Outros ajustes - " + (nomes[0] if len(nomes) == 1 else ", ".join(nomes[:-1]) + " e " + nomes[-1])
+
+
+def outros(a, mat, gravar, tem_valor=True):
+    """Valida o agrupamento do agente (arquivo --outros) e cria ou atualiza os tickets no WEB."""
+    plano = json.load(open(a.outros))["tickets"]
+    por_sha = {c["sha"]: c for c in mat}
+    usados, vistas = set(), set()
+    for t in plano:
+        secoes = t["secoes"]
+        n = sum(len(x["itens"]) for x in secoes)
+        if len(secoes) > 1 and n > OUTROS_LIMITE:
+            erro(f"{titulo_outros(secoes)}: {n} itens juntando seções (máx. {OUTROS_LIMITE}); separe")
+        for x in secoes:
+            if x["nome"] in vistas:
+                erro(f"seção repetida em mais de um ticket: {x['nome']}")
+            vistas.add(x["nome"])
+            for it in x["itens"]:
+                for sha in it["commits"]:
+                    if sha not in por_sha:
+                        erro(f"commit {sha} não é da versão (item: {it['testar']})")
+                    usados.add(sha)
+    faltam = [c for c in mat if c["sha"] not in usados]
+    if faltam:
+        erro("commits da versão sem item: " + "; ".join(f"{c['sha']} {c['assunto'][:60]}" for c in faltam))
+
+    # Sem o valor no campo Versão, a busca por ele é recusada: não há ticket ainda.
+    existentes = {} if not tem_valor else {i["summary"]: i for i in yt("issues", {
+        "query": f'project: WEB {CAMPO}: {a.versao} summary: "Outros ajustes"',
+        "fields": "idReadable,summary,description", "$top": 50}) if i["summary"].startswith("Outros ajustes")}
+    feitos = []
+    for t in plano:
+        titulo = titulo_outros(t["secoes"])
+        linhas = [f"Ajustes da {a.versao} sem ticket próprio na versão. O que pode ter sido impactado:", ""]
+        for x in t["secoes"]:
+            linhas += [f"**{x['nome']}**"]
+            for it in x["itens"]:
+                ref = sorted({i for sha in it["commits"] for i in re.findall(r"\b([A-Z]{2,5}-\d+)\b", por_sha[sha]["assunto"])})
+                linhas.append(f"- {it['testar']}" + (f" ({', '.join(ref)})" if ref else ""))
+            linhas.append("")
+        desc = "\n".join(linhas).rstrip() + "\n"
+        ex = existentes.pop(titulo, None)
+        n = sum(len(x["itens"]) for x in t["secoes"])
+        print(f"{ex['idReadable'] if ex else 'criar'}: {titulo} ({n} itens)")
+        if not gravar:
+            print("  " + desc.replace("\n", "\n  ").rstrip())
+            continue
+        if ex:
+            if ex.get("description") != desc:
+                yt(f"issues/{ex['idReadable']}", {"fields": "idReadable"}, "POST", {"description": desc})
+            feitos.append(ex["idReadable"])
+        else:
+            campos = [{"name": "State", "$type": "StateIssueCustomField", "value": {"name": ESTADO}},
+                      {"name": CAMPO, "$type": "SingleVersionIssueCustomField", "value": {"name": a.versao}},
+                      {"name": "Ambiente de Teste", "$type": "SingleEnumIssueCustomField", "value": {"name": "Alpha"}}]
+            novo = yt("issues", {"fields": "idReadable"}, "POST",
+                      {"project": {"id": projeto_id("WEB")}, "summary": titulo, "description": desc, "customFields": campos})
+            feitos.append(novo["idReadable"])
+    for titulo, ex in existentes.items():
+        print(f"SOBROU: {ex['idReadable']} ({titulo}) não está mais no agrupamento; trate à mão")
+    if gravar:
+        print(f"Outros ajustes: {' '.join(feitos)}")
+
+
+def projeto_id(nome):
+    projetos = yt("admin/projects", {"fields": "id,shortName", "query": nome, "$top": 50})
+    return next((p["id"] for p in projetos if p["shortName"] == nome), None) or erro(f"projeto {nome} não achado")
+
+
 def carregar_conf():
     """slug -> (entra|fora, rótulo). Cria o arquivo com o que já se sabe se ele não existe."""
     if not os.path.exists(CONF):
@@ -254,6 +364,12 @@ def main():
     ap.add_argument("--montagem", action="store_true")
     ap.add_argument("--trocar", nargs="+", default=[], metavar="ID",
                     help="tickets cuja Versão de outra linha (ex.: vue26.4.005) pode ser trocada, já confirmado")
+    ap.add_argument("--manter", nargs="+", default=[], metavar="ID",
+                    help="tickets que ficam na Versão de outra linha e fora desta, já confirmado")
+    ap.add_argument("--outros-material", action="store_true",
+                    help="imprime em JSON os commits da versão sem ticket nela e sai")
+    ap.add_argument("--outros", metavar="ARQUIVO",
+                    help="JSON com o agrupamento em tickets \"Outros ajustes\" (ver SKILL.md)")
     a = ap.parse_args()
     RE_VERSAO.match(a.versao) or erro(f"versão inválida: {a.versao} (esperado vYY.T.NNN)")
 
@@ -314,6 +430,20 @@ def main():
     # Versão de outra linha (Vue, hotfix do Vue...) no campo: trocar apaga a dela; só com confirmação.
     outra_linha = [i for i in entram if campo(por_id[i], CAMPO) and campo(por_id[i], CAMPO) != a.versao
                    and not RE_BACKEND.match(campo(por_id[i], CAMPO)) and i not in a.trocar]
+    # Confirmado que fica na outra linha: sai desta versão sem mexer no campo.
+    mantidos = [i for i in outra_linha if i in a.manter]
+    entram = [i for i in entram if i not in mantidos]
+    outra_linha = [i for i in outra_linha if i not in mantidos]
+
+    if a.outros_material or a.outros:
+        if a_confirmar or outra_linha:
+            erro("resolva o que está A CONFIRMAR antes dos Outros ajustes", 5)
+        servicos_slug = [s for s in sorted(achados) if s != crm_slug and conf.get(s, ("",))[0] == "entra"]
+        mat = material_outros(crm, crm_slug, clones, servicos_slug, a.versao, entram)
+        if a.outros_material:
+            json.dump(mat, sys.stdout, ensure_ascii=False, indent=1)
+            print()
+            return
 
     # 2. Ticket de versão.
     segunda = proxima_segunda()
@@ -340,7 +470,9 @@ def main():
     for i in sorted(so_fora):
         if i in fora:
             print(f"  fora: {i}  {' + '.join(so_fora[i])}  {por_id[i]['summary'][:80]}")
-    sem = [i for i in fora if i not in so_fora]
+    for i in mantidos:
+        print(f"  fora: {i}  {' + '.join(origem[i])}  [mantém {campo(por_id[i], CAMPO)}]  {por_id[i]['summary'][:80]}")
+    sem = [i for i in fora if i not in so_fora and i not in mantidos]
     print(f"Ficam fora, sem commit nem PR em projeto com ambiente de teste ({len(sem)}): {' '.join(sem) or '-'}")
     print(f"Serviços na versão: {', '.join(servicos) or 'nenhum'}")
     if existente:
@@ -353,8 +485,10 @@ def main():
         print("  Sobe na versão de bugfix de segunda? Pergunte a quem acionou e registre lá (entra|fora).")
     if outra_linha:
         print(f"A CONFIRMAR: {' '.join(outra_linha)} já têm versão de outra linha no campo {CAMPO}; trocar apaga a dela.")
-        print("  Pergunte a quem acionou; se for trocar, rode de novo com --trocar <IDs>.")
+        print("  Pergunte a quem acionou e rode de novo com --trocar <IDs> ou --manter <IDs>.")
     if a.plano:
+        if a.outros:
+            outros(a, mat, gravar=False, tem_valor=tem_valor)
         print("(plano: nada gravado)")
         return
     if a_confirmar or outra_linha:
@@ -374,8 +508,7 @@ def main():
         if existente[0].get("description") != desc:
             yt(f"issues/{pid}", {"fields": "idReadable"}, "POST", {"description": desc})
     else:
-        projeto = yt("admin/projects", {"fields": "id,shortName", "query": "PID", "$top": 50})
-        pid_id = next((p["id"] for p in projeto if p["shortName"] == "PID"), None) or erro("projeto PID não achado")
+        pid_id = projeto_id("PID")
         campos = [{"name": n, "$type": "SingleEnumIssueCustomField", "value": {"name": v}} for n, v in PID.items()]
         campos += [{"name": "Responsável", "$type": "SingleUserIssueCustomField", "value": {"login": RESPONSAVEL}}, valor]
         novo = yt("issues", {"fields": "idReadable"}, "POST",
@@ -383,6 +516,8 @@ def main():
         pid = novo["idReadable"]
     print(f"Pronto: {a.versao} em {len(entram)} tickets; ticket de versão {pid}")
     print(f"{YT}/issues?q=" + urllib.parse.quote(f"{CAMPO}: {a.versao}"))
+    if a.outros:
+        outros(a, mat, gravar=True)
 
 
 if __name__ == "__main__":

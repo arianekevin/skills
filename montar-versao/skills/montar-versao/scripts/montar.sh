@@ -104,7 +104,7 @@ preparar)
   fi
   echo
   pl=(); [ $plano = 1 ] && pl=(--plano)
-  REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" ${pl[@]+"${pl[@]}"} ${TROCAR:+--trocar $TROCAR}
+  REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" ${pl[@]+"${pl[@]}"} ${TROCAR:+--trocar $TROCAR} ${MANTER:+--manter $MANTER} ${OUTROS:+--outros $OUTROS}
   ;;
 
 principal)
@@ -152,7 +152,7 @@ principal)
   fi
   echo "Pronto: tag $nova e ${ALPHA#origin/} no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
   # YouTrack: tickets que ficaram aptos na semana e a linha App do ticket de versão.
-  [ -n "${SEM_YOUTRACK:-}" ] || { echo; REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" --montagem ${TROCAR:+--trocar $TROCAR}; }
+  [ -n "${SEM_YOUTRACK:-}" ] || { echo; REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" --montagem ${TROCAR:+--trocar $TROCAR} ${MANTER:+--manter $MANTER} ${OUTROS:+--outros $OUTROS}; }
   ;;
 
 hotfix)

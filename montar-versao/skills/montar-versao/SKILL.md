@@ -54,7 +54,9 @@ campo Versão, o campo Versão dos tickets e o ticket de versão.
      pergunte se ele sobe na versão de bugfix de segunda. Registre a resposta no arquivo
      (`<slug> entra <rótulo>` ou `<slug> fora`) e rode o plano de novo.
    - Ticket que já tem versão de outra linha no campo (ex.: `vue26.4.005`): trocar apaga a
-     dela. Se for trocar, use `TROCAR="IN-1 IN-2" montar.sh preparar`.
+     dela. Se for trocar, use `TROCAR="IN-1 IN-2" montar.sh preparar`. Se ficar na outra
+     linha, use `MANTER="IN-1 IN-2" montar.sh preparar`: o ticket sai desta versão e o
+     campo não muda. Os dois podem ir juntos, cada ticket em um.
 3. `montar.sh preparar` faz, nesta ordem:
    - commit `chore: bump versao para <versão>` no pom, sobre a ponta da alpha, e push
      (só fast-forward);
@@ -66,6 +68,42 @@ campo Versão, o campo Versão dos tickets e o ticket de versão.
 
    Rodar de novo é seguro. Bump feito não se refaz, e ticket que já está na versão fica
    como está. O ticket de versão é atualizado, não duplicado.
+4. **Outros ajustes.** Depois que nada está `A CONFIRMAR`, cubra o que sobe sem ticket na
+   versão: commits de LAT, DEL, IN de outra linha, ticket que não está apto, commit sem
+   ticket, e os serviços que entram. Para cada área, o QA recebe o que pode ter sido
+   impactado. Não é o detalhe do commit. Exemplo: um LAT mexeu no filtro da listagem de
+   contatos, então o item é "Listagens de contatos".
+   1. Material: `REPO=<clone> python3 scripts/preparar.py --versao <versão>
+      --outros-material [--manter ...] [--trocar ...] > material.json`. São os commits da
+      versão, com assunto e arquivos, sem os que citam um ticket dela. Commit que cita um
+      ticket da versão é testado pelo dele.
+   2. Mapeie os pontos a testar. Cada ponto entra numa seção só, a do CRM mais afetada
+      (Contatos, Oportunidades, Tarefas, Configurações...). Vários commits podem virar um
+      ponto.
+   3. Monte os tickets:
+      - seção com mais de 8 pontos fica num ticket só dela;
+      - as menores se juntam, até 8 pontos por ticket;
+      - junte seções próximas: Oportunidades com Qualificação, Tarefas com Compromissos.
+      Organize os tickets de forma fluida.
+   4. Escreva o agrupamento num JSON:
+      ```json
+      {"tickets": [{"secoes": [{"nome": "Oportunidades", "itens": [
+          {"testar": "Mudar etapa pelo stepper e pela barra lateral", "commits": ["4a022a5909"]}]},
+        {"nome": "Qualificação", "itens": [...]}]}]}
+      ```
+   5. Rode `OUTROS=<json> montar.sh preparar --plano` e mostre os tickets. Depois rode o
+      mesmo comando sem `--plano`.
+
+   O script recusa:
+   - commit do material sem item;
+   - sha que não é da versão;
+   - seção repetida;
+   - ticket que junta seções e passa de 8 itens (`OUTROS_LIMITE`).
+
+   Cada ticket nasce no WEB, em "Apto para teste", com Ambiente de Teste Alpha e o campo
+   Versão. O título é "Outros ajustes - <seções>". Rodar de novo atualiza o ticket de mesmo
+   título. Se o agrupamento mudou, o ticket com título que não existe mais sai como
+   `SOBROU`: leve isso a quem acionou.
 
 **Quais tickets entram.** WEB e IN em "Apto para teste" com commit no ramo de teste do
 projeto que a última versão dele não tem, ou com PR aberto para esse ramo. O ramo de teste
@@ -102,6 +140,11 @@ versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sob
    a tag já subiu. Resolva como no preparo e rode só o YouTrack:
    `REPO=<clone> python3 scripts/preparar.py --versao <versão> --montagem`.
    `SEM_YOUTRACK=1` pula esse passo.
+
+   A semana pode ter trazido commits novos, e aí os Outros ajustes do preparo ficam
+   desatualizados. Gere o material de novo com `--montagem` e refaça o agrupamento a partir
+   do anterior. Depois rode o YouTrack com `--outros <json>`. O material da montagem vai até
+   a tag.
 4. Monte os serviços que o ticket de versão lista na Insider (ver abaixo).
 
 ## Serviço que sobe junto

@@ -323,7 +323,11 @@ Versão e hotfix sem levar a alpha inteira. Tudo entra na alpha primeiro; daí:
     (alpha ou homolog) de um projeto que sobe na segunda;
   - abre o ticket de versão para a infra, datado na próxima segunda.
 
-  Projeto ou ticket em dúvida trava a gravação até quem acionou confirmar.
+  - abre os tickets "Outros ajustes - <seções>" no WEB. Eles cobrem o que sobe sem ticket na
+    versão (LAT, DEL, commit sem ticket) e dizem as áreas a testar, agrupadas por seção do CRM.
+
+  Projeto ou ticket em dúvida trava a gravação até quem acionou confirmar. Ticket com versão
+  de outra linha (Vue) se troca (`--trocar`) ou fica nela (`--manter`).
 
 - **Versão principal** `vYY.T.NNN` (T = trimestre, NNN recomeça a cada trimestre): commit de bump
   do pom em cima da ponta da alpha, com a tag. Dá push na tag e no bump na alpha, juntos (atômico).
