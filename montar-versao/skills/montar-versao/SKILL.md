@@ -80,6 +80,13 @@ campo Versão, o campo Versão dos tickets e o ticket de versão.
    2. Mapeie os pontos a testar. Cada ponto entra numa seção só, a do CRM mais afetada
       (Contatos, Oportunidades, Tarefas, Configurações...). Vários commits podem virar um
       ponto.
+
+      Cada ponto é uma ação curta que o QA executa, com o perfil quando ele importa:
+      "Listar contatos", "Abrir modal de tarefa", "Visualizar oportunidade com usuário
+      básico". Leia o corpo do commit para achar a ação.
+      - Não escreva passo a passo.
+      - Não escreva área genérica ("Tabelas: permissões").
+      - Não escreva o que mudou ("passa a validar...").
    3. Monte os tickets:
       - seção com mais de 8 pontos fica num ticket só dela;
       - as menores se juntam, até 8 pontos por ticket;
