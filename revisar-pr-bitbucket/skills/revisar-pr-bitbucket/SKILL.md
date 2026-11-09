@@ -94,7 +94,9 @@ Quem lê a explicação do autor antes do código tende a confirmar a tese dele 
 - O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script, migration, ou o dev dizer no PR ou no ticket que o reparo foi feito direto no banco), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
 - Refaça o caminho de quem vai testar o ticket. Do "como reproduzir" (tela ou endpoint), liste as entradas que levam ao sintoma — a mesma tela costuma ter mais de uma (página cheia, painel lateral, edição rápida, modal; cada uma pode chamar outra rota) — e as variantes de dado que o ticket ou a ação implicam (formato com e sem máscara, campo vazio, criar, editar e desativar, registro removido). Confira cada uma contra o diff. A que o PR não cobre e cai no mesmo sintoma é `parcial`.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
-- Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)?
+- Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)? Leia o arquivo que consome, inclusive em outro repositório, antes de dizer que "na tela não afeta".
+- **PR só de tela** (nenhuma mudança fora de JS, HTML, CSS ou texto): nenhum teste automático vai provar o caminho, então a prova é sua. Liste cada função entre o ponto de entrada (init, clique, rota) e a chamada que o ticket precisa que aconteça, na ordem em que rodam. Para cada dado que vem do servidor nesse caminho, diga o que acontece com nulo, campo ausente e lista vazia (`.includes`, `.length`, acesso a propriedade). Uma exceção antes da chamada, engolida por um `.catch`, é o mesmo bug do ticket. Sem essa lista, a nota de `ticket` não passa de 6.
+- Correção ou ganho de desempenho que depende de índice, migration ou configuração de banco: leia a migration (portão de tamanho, "criar à mão", `CONCURRENTLY`). Se o índice ou a migration não roda sozinho no deploy, registre em `depende_de` (`{"repo": "ambiente", "ref": "<índice ou migration>", "o_que": "conferir que existe no ambiente de teste e em produção"}`).
 - Catch que só loga + nova validação = dado perdido em silêncio (lead, importação, webhook).
 - Nova consulta: tem paginação/limite? Roda por linha? Filtra tenant? Concatena valor da request? Segura transação aberta enquanto chama serviço externo?
 - Campo novo mapeado no ORM entra no UPDATE de linha inteira dos fluxos antigos? (Um fluxo que regrava a entidade inteira desfaz o que outro gravou por SQL.)
@@ -197,6 +199,10 @@ Régua: 10 = nada a apontar; 7–9 = ressalva que não segura o merge; 5–6 = �
 
 Ressalva que você não conferiu não é 7–9. "A conferir no ambiente", "o teste não roda contra o banco", "não vi se X chama isto" é dúvida sobre o eixo, não ressalva menor: confira no código. Se a dúvida cai, a nota sobe; se fica de pé e o cenário é de uso normal, é ⚠️ do eixo (nota 5–6) com "(a confirmar: o que faltou olhar)". Dependência de outro repositório não é dúvida: vai em `depende_de` e não baixa a nota.
 
+Por isso, todo `porque` de nota 7–9 que traz ressalva ("fora do escopo", "assume", "não afeta", "falta validar", "deve") termina com a prova: `conferido em <arquivo:linha>` ou `não conferido`. Com `não conferido`, a nota é 6 ou menos e o achado vai junto. Duas ressalvas pedem uma busca antes da prova:
+- **"Fora do escopo" ou "outra porta não afeta":** procure com `git grep` a mesma gravação ou chamada que o PR corrigiu nos caminhos irmãos (as outras integrações do mesmo tipo, a outra versão da API, a ação em massa) e liste o que achou no `porque`. Porta irmã com o mesmo defeito, no caminho do ticket, é `parcial`.
+- **"Assume que X é a causa":** confira X contra o sintoma do ticket (stack, log, dado). Se não fecha, a nota de `ticket` não passa de 6.
+
 O registro é estatística da esteira, não muda o veredito nem o comentário.
 
 ## Calibração
@@ -222,7 +228,7 @@ O `achados.md` é tudo o que o corretor vai ler, então:
 
 **Pedido de ajuste por comentário.** Se o dev pede que o ajuste seja feito ("pode corrigir", "aplica a opção B"), vale quando está ligado a um achado ou a uma decisão pendente deste PR: trate como a decisão acima. Pedido que não tem achado nem pendência por trás (uma melhoria nova, outro escopo) não vai para o corretor e não vira achado: o comentário não é canal de pedido novo.
 
-**Quando o achado não vai ao corretor.** O script de triagem manda direto ao dev, com comentário e request changes, o PR cujos achados são todos `nao_corrige_o_ticket` ou `decisao_de_produto`: sem causa confirmada ou sem decisão, o corretor não tem o que mudar. Achado que traz a decisão já tomada (por comentário, acima) não é `decisao_de_produto`: registre a categoria da mudança que falta (`parcial`, `efeito_colateral`…). Se o pedido avisar que a última volta do corretor no PR terminou sem mudança, siga o que ele diz.
+**Quando o achado não vai ao corretor.** O script de triagem manda direto ao dev, com comentário e request changes, o PR cujos achados são todos `nao_corrige_o_ticket` ou `decisao_de_produto`: sem causa confirmada ou sem decisão, o corretor não tem o que mudar. Achado que só pede para seguir a leitura do QA sobre um critério ambíguo, quando o código segue uma regra geral do sistema (configuração global, padrão de resposta da API), é `decisao_de_produto`: cite a regra geral no achado. Achado que traz a decisão já tomada (por comentário, acima) não é `decisao_de_produto`: registre a categoria da mudança que falta (`parcial`, `efeito_colateral`…). Se o pedido avisar que a última volta do corretor no PR terminou sem mudança, siga o que ele diz.
 
 Na entrega final, a ação desses PRs é "enviado ao corretor" ou "direto ao dev".
 

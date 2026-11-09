@@ -31,7 +31,9 @@ O `CLAUDE.md` do repo vale para você como para qualquer dev: comando de build, 
   - há mais de um jeito razoável e eles mudam o que o usuário vê, o contrato da API ou o dado gravado;
   - a correção pede mexer no que já está gravado em produção (script de reparo, migration que reescreve dado) — você não roda nada em banco e não escreve reparo de dado por conta própria;
   - um teste existente quebra com a correção e não dá para dizer, pelo ticket, qual dos dois lados está certo (ver "Teste que quebra com a correção");
-  - a causa raiz do bug do ticket não é a que o PR ataca e você não conseguiu confirmar a verdadeira no código.
+  - a causa raiz do bug do ticket não é a que o PR ataca e você não conseguiu confirmar a verdadeira no código;
+  - a correção abre exceção a uma regra geral do código: anotação que sobrescreve uma configuração global (ex.: `@JsonInclude(ALWAYS)` contra o `NON_NULL` global), formato de resposta diferente do resto da mesma API, um campo que passa a se comportar diferente dos vizinhos. Se você se pegar escrevendo "sobrescreve X só neste campo", pare: é DECISÃO, citando a regra geral e onde ela está;
+  - o achado só se sustenta na leitura que o QA fez de um critério de aceite que admite duas leituras, e o código segue o padrão do sistema. Diga as duas leituras e qual o padrão do sistema escolhe.
 
 Na dúvida entre CORRIGIDO e DECISÃO, é DECISÃO. Corrigir errado custa mais que perguntar.
 
