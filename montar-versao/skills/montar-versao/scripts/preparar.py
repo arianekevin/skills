@@ -364,22 +364,48 @@ def descricao(versao, servicos, app):
     return "\n".join(linhas)
 
 
+def _secao(l):
+    """'--- Insider --- 10/11' e '--- Insider ---' são a mesma seção."""
+    m = re.match(r"-+\s*(\w+)", l)
+    return m.group(1) if m else l
+
+
 def mesclar(antiga, nova):
-    """Mantém o que alguém já preencheu à mão: linha "chave: valor" só é trocada se estava 'a definir'."""
+    """Mantém o que alguém já preencheu à mão: linha "chave: valor" só é trocada se estava 'a definir';
+    cabeçalho de seção editado fica; linha à mão que o modelo não tem (outro serviço, nota) fica no fim
+    da seção. Só "Imagem do serviço ..." é do script: a que saiu da lista sai da descrição."""
     if not antiga:
         return nova
-    feitas = {}
+    feitas, cabecalhos, extras = {}, {}, {}
+    chaves_novas, secao = set(), ""
+    for l in nova.splitlines():
+        if l.startswith("---"):
+            secao = _secao(l)
+        elif ":" in l:
+            chaves_novas.add((secao, l.split(":")[0]))
     secao = ""
     for l in antiga.splitlines():
         if l.startswith("---"):
-            secao = l
-        elif ":" in l and A_DEFINIR not in l:
-            feitas[(secao, l.split(":")[0])] = l
+            secao = _secao(l)
+            cabecalhos[secao] = l
+        elif ":" in l and (secao, l.split(":")[0]) in chaves_novas:
+            if A_DEFINIR not in l:
+                feitas[(secao, l.split(":")[0])] = l
+        elif l.strip() and not l.startswith("Imagem do serviço "):
+            extras.setdefault(secao, []).append(l)
     saida, secao = [], ""
-    for l in nova.splitlines():
+    linhas = nova.splitlines()
+    for n, l in enumerate(linhas):
         if l.startswith("---"):
-            secao = l
+            secao = _secao(l)
+            saida.append(cabecalhos.get(secao, l))
+            continue
         saida.append(feitas.get((secao, l.split(":")[0]), l) if ":" in l else l)
+        fim_da_secao = n + 1 == len(linhas) or linhas[n + 1].startswith("---") or not linhas[n + 1].strip()
+        if secao and l.strip() and fim_da_secao:
+            saida += extras.pop(secao, [])
+    for secao, resto in extras.items():  # seção que o modelo não tem: vai inteira, com o cabeçalho
+        saida += ["", cabecalhos[secao]] + resto if secao in cabecalhos else resto
     return "\n".join(saida)
 
 
