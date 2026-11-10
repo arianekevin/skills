@@ -127,6 +127,11 @@ O nectarcrm sempre entra. Os outros projetos seguem o `projetos.conf`:
 - `fora`: projeto que não sobe na segunda, como o reloaded, cujo Vue sobe à parte. O
   ticket só dele fica fora.
 
+**Serviço entra pelo commit, não só pelo ticket.** Clone com commit no ramo de teste que a
+última principal dele não tem entra na versão mesmo sem ticket apto: a versão leva tudo que
+foi commitado. O plano lista quantos commits cada serviço traz. Projeto `fora` não entra;
+projeto fora do `projetos.conf` com commit cai em `A CONFIRMAR`.
+
 **Descrição do ticket de versão.** No preparo, a Insider sai com o crm e os serviços na
 versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sobrescrita.
 
@@ -152,7 +157,8 @@ versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sob
    desatualizados. Gere o material de novo com `--montagem` e refaça o agrupamento a partir
    do anterior. Depois rode o YouTrack com `--outros <json>`. O material da montagem vai até
    a tag.
-4. Monte os serviços que o ticket de versão lista na Insider (ver abaixo).
+4. Monte todos os serviços que o plano lista em "Serviços na versão" (ver abaixo), com ou
+   sem ticket. Não deixe nenhum de fora.
 
 ## Serviço que sobe junto
 

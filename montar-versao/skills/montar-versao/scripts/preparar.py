@@ -7,6 +7,8 @@
 2. Acha os tickets WEB/IN em "Apto para teste" que são do backend: têm commit na alpha
    ainda fora da última versão, ou PR aberto para a alpha, no nectarcrm ou num serviço que
    sobe junto (sparknectarbi, automation-flow). Põe a versão no campo "Versão" deles.
+   Serviço com commit no ramo de teste que a última principal dele não tem entra na versão
+   mesmo sem ticket apto: a versão leva tudo que foi commitado. Projeto "fora" (reloaded) não.
 3. Cria (ou atualiza, se já existe) o ticket de versão no PID para o Hugo:
    "Versão - DD/MM", com DD/MM = próxima segunda.
    Com --montagem, a linha "App" sai com a versão que está no insider hoje (a mais recente
@@ -42,7 +44,7 @@ WORKSPACE = os.environ.get("BITBUCKET_WORKSPACE", "gitcolmeia")
 CONF = os.path.expanduser(os.environ.get("PREPARAR_CONF", "~/.claude/montar-versao/projetos.conf"))
 CONF_INICIAL = """# Projetos com ambiente de teste (alpha ou homolog) e se sobem na versão de bugfix de segunda.
 # <slug do Bitbucket> <entra|fora> [rótulo no ticket de versão]
-# O nectarcrm sempre entra. Projeto com ticket apto que não está aqui trava a gravação até alguém
+# O nectarcrm sempre entra. Projeto com ticket apto ou commit da versão que não está aqui trava a gravação até alguém
 # confirmar com quem acionou a skill; a resposta vem para cá.
 sparknectarbi    entra  BI3
 automation-flow  entra  automation-flow
@@ -418,7 +420,19 @@ def main():
             if onde:
                 achados.setdefault(s, {})[i] = onde
 
-    # Quem sobe na segunda. Projeto com ticket que a lista não conhece trava a gravação.
+    # Serviço com commit no ramo de teste fora da última principal dele sobe, com ou sem ticket apto.
+    com_commit = {}  # slug -> commits da versão
+    for s, repo in sorted(clones.items()):
+        if s == crm_slug or conf.get(s, ("",))[0] == "fora":
+            continue
+        ramo = ramo_de_teste(repo)
+        if ramo:
+            n = len(commits_da_versao(repo, ultima_principal(repo), ramo))
+            if n:
+                com_commit[s] = n
+                achados.setdefault(s, {})
+
+    # Quem sobe na segunda. Projeto com ticket ou commit que a lista não conhece trava a gravação.
     a_confirmar = sorted(s for s in achados if s != crm_slug and s not in conf)
     servicos = [conf[s][1] for s in sorted(achados) if s != crm_slug and conf.get(s, ("",))[0] == "entra"]
     origem, so_fora = {}, {}
@@ -477,13 +491,16 @@ def main():
     sem = [i for i in fora if i not in so_fora and i not in mantidos]
     print(f"Ficam fora, sem commit nem PR em projeto com ambiente de teste ({len(sem)}): {' '.join(sem) or '-'}")
     print(f"Serviços na versão: {', '.join(servicos) or 'nenhum'}")
+    for s in sorted(com_commit):
+        if conf.get(s, ("",))[0] == "entra":
+            print(f"  {s}: {com_commit[s]} commit(s) desde {ultima_principal(clones[s])}; tag {a.versao} na ponta de {ramo_de_teste(clones[s])}")
     if existente:
         print(f"Ticket de versão: {existente[0]['idReadable']} ({existente[0]['summary']}) — atualizar descrição")
     else:
         print(f"Ticket de versão: criar \"{titulo}\" no PID para {RESPONSAVEL}")
     print("  " + desc.replace("\n", "\n  "))
     if a_confirmar:
-        print(f"A CONFIRMAR: {', '.join(a_confirmar)} tem ticket apto e não está em {CONF}.")
+        print(f"A CONFIRMAR: {', '.join(a_confirmar)} tem ticket apto ou commit da versão e não está em {CONF}.")
         print("  Sobe na versão de bugfix de segunda? Pergunte a quem acionou e registre lá (entra|fora).")
     if outra_linha:
         print(f"A CONFIRMAR: {' '.join(outra_linha)} já têm versão de outra linha no campo {CAMPO}; trocar apaga a dela.")
