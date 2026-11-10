@@ -374,6 +374,15 @@ def depends(v):
     return out[:5]
 
 
+def open_doors(v):
+    """Furos de segurança achados em porta irmã, fora do ticket: só os com arquivo:linha."""
+    out = []
+    for d in v.get("portas_abertas") or []:
+        if isinstance(d, dict) and d.get("onde"):
+            out.append({k: str(d.get(k) or "")[:300] for k in ("onde", "o_que")})
+    return out[:5]
+
+
 def keep_verdicts(record, out):
     """Junta o registro da rodada em vereditos.jsonl (histórico para estatística), com a hora e a rodada.
     Linha inválida ou categoria fora da lista é guardada como 'outro', para não perder o PR."""
@@ -389,7 +398,7 @@ def keep_verdicts(record, out):
             cats = [c if c in CATEGORIES else "outro" for c in v.get("categorias") or []]
             fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": v.get("commit"),
                                  "tickets": [str(t) for t in v.get("tickets") or [] if isinstance(t, str)][:10], "veredito": v.get("veredito"), "categorias": cats, "notas": scores(v),
-                                 "depende_de": depends(v),
+                                 "depende_de": depends(v), "portas_abertas": open_doors(v),
                                  "plugin": plugin_version(), "modelo": MODEL or "padrão"}, ensure_ascii=False) + "\n")
     record.unlink()
 

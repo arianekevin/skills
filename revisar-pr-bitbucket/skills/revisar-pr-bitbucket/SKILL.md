@@ -174,9 +174,11 @@ Entrega final: tabela ticket | PR (link) | veredito | ação aplicada (comentado
 Só quando o pedido indicar um arquivo de registro. Uma linha JSON por PR revisado (pulado não entra), no fim da revisão, valha o modo que for:
 ```json
 {"pr": 123, "commit": "<hash curto revisado>", "tickets": ["WEB-1234"], "veredito": "aprovado | ajuste | inconclusivo", "categorias": ["..."],
- "depende_de": [], "notas": {"seguranca": {"n": 10, "porque": "..."}, "risco": {"n": 7, "porque": "..."}, "ticket": {"n": 9, "porque": "..."}}}
+ "depende_de": [], "portas_abertas": [], "notas": {"seguranca": {"n": 10, "porque": "..."}, "risco": {"n": 7, "porque": "..."}, "ticket": {"n": 9, "porque": "..."}}}
 ```
 `depende_de` (opcional): partes da correção do ticket que estão fora deste PR, em outro repositório ou em outro PR, sem as quais quem testar o ticket ainda vê o problema. Uma entrada por parte: `{"repo": "<repositório>", "ref": "<commit, branch ou PR, se o ticket ou o PR disser>", "o_que": "<uma linha>"}`. Lista vazia ou ausente quando o PR fecha sozinho. Não é achado: o PR segue no veredito que tiver; quem consome o registro decide o que fazer com o ticket.
+
+`portas_abertas` (opcional): furo de segurança (acesso, permissão, tenant, dado de outra conta) que a busca nas portas irmãs achou fora do caminho do ticket — o mesmo defeito que o PR corrigiu, numa porta que o ticket não cita (a outra versão da API, a outra integração). Uma entrada por porta: `{"onde": "<arquivo:linha>", "o_que": "<o que falta conferir, uma linha>"}`, só com `onde` conferido no código. Não é achado e não muda veredito, nota nem comentário: quem consome o registro leva a porta até alguém que decide se vira ticket. Porta irmã no caminho do ticket continua sendo `parcial`.
 
 `tickets`: os ids do YouTrack que o PR trata (lista vazia se não houver). `categorias`: uma por tipo de achado de pé (❌/⚠️), sem repetir; lista vazia se aprovado ou inconclusivo, salvo `investigacao`. Só destes valores:
 - `investigacao`: PR de investigação aprovado (só log ou diagnóstico, primeira etapa; não fecha o ticket). Vai com veredito `aprovado`
@@ -200,7 +202,7 @@ Régua: 10 = nada a apontar; 7–9 = ressalva que não segura o merge; 5–6 = �
 Ressalva que você não conferiu não é 7–9. "A conferir no ambiente", "o teste não roda contra o banco", "não vi se X chama isto" é dúvida sobre o eixo, não ressalva menor: confira no código. Se a dúvida cai, a nota sobe; se fica de pé e o cenário é de uso normal, é ⚠️ do eixo (nota 5–6) com "(a confirmar: o que faltou olhar)". Dependência de outro repositório não é dúvida: vai em `depende_de` e não baixa a nota.
 
 Por isso, todo `porque` de nota 7–9 que traz ressalva ("fora do escopo", "assume", "não afeta", "falta validar", "deve") termina com a prova: `conferido em <arquivo:linha>` ou `não conferido`. Com `não conferido`, a nota é 6 ou menos e o achado vai junto. Duas ressalvas pedem uma busca antes da prova:
-- **"Fora do escopo" ou "outra porta não afeta":** procure com `git grep` a mesma gravação ou chamada que o PR corrigiu nos caminhos irmãos (as outras integrações do mesmo tipo, a outra versão da API, a ação em massa) e liste o que achou no `porque`. Porta irmã com o mesmo defeito, no caminho do ticket, é `parcial`.
+- **"Fora do escopo" ou "outra porta não afeta":** procure com `git grep` a mesma gravação ou chamada que o PR corrigiu nos caminhos irmãos (as outras integrações do mesmo tipo, a outra versão da API, a ação em massa) e liste o que achou no `porque`. Porta irmã com o mesmo defeito, no caminho do ticket, é `parcial`; fora do caminho do ticket, se o defeito é de segurança, vai em `portas_abertas`.
 - **"Assume que X é a causa":** confira X contra o sintoma do ticket (stack, log, dado). Se não fecha, a nota de `ticket` não passa de 6.
 
 O registro é estatística da esteira, não muda o veredito nem o comentário.
