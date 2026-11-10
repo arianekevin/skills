@@ -130,10 +130,11 @@ def contem(repo, tag, ramo):
         ["git", "-C", repo, "merge-base", "--is-ancestor", f"refs/tags/{tag}", ramo]).returncode == 0
 
 
-def base_no_ramo(repo, ramo):
+def base_no_ramo(repo, ramo, antes_de=None):
     """Última versão (principal ou hotfix) que o ramo já contém. Tag de versão posta fora do ramo
     (ex.: numa feature na master) não serve de base. Sem nenhuma vYY.T.NNN, a tag mais próxima."""
-    tags = [t for t in git(repo, "tag", "-l", "v*").split() if RE_BACKEND.match(t)]
+    tags = [t for t in git(repo, "tag", "-l", "v*").split()
+            if RE_BACKEND.match(t) and not (antes_de and (t == antes_de or t.startswith(antes_de + ".")))]
     tags.sort(key=lambda t: [int(x) for x in t[1:].split(".")], reverse=True)
     for t in tags:
         if contem(repo, t, ramo):
@@ -227,7 +228,7 @@ def material_outros(crm, crm_slug, clones, servicos, versao, entram):
         fim = tag if s == crm_slug and subprocess.run(
             ["git", "-C", repo, "rev-parse", "-q", "--verify", tag], capture_output=True).returncode == 0 \
             else ramo_de_teste(repo)
-        base = ultima_principal(repo, antes_de=versao) if s == crm_slug else base_no_ramo(repo, ramo_de_teste(repo))
+        base = ultima_principal(repo, antes_de=versao) if s == crm_slug else base_no_ramo(repo, ramo_de_teste(repo), versao)
         for c in commits_da_versao(repo, base, fim):
             ids = set(re.findall(r"\b((?:%s)-\d+)\b" % "|".join(PROJETOS), f"{c['assunto']} {c['corpo']}".upper()))
             if ids & set(entram):  # cita um ticket da versão: o teste é o dele
@@ -423,7 +424,7 @@ def main():
             if not ramo:
                 continue
             buscar(repo)
-            base = ultima_principal(repo, antes_de=a.versao) if s == crm_slug else base_no_ramo(repo, ramo)
+            base = ultima_principal(repo, antes_de=a.versao) if s == crm_slug else base_no_ramo(repo, ramo, a.versao)
             commits = ids_em_commits(repo, ramo, base)
         else:
             ramo, commits = None, set()
@@ -450,7 +451,7 @@ def main():
         ramo = ramo_de_teste(repo)
         if not ramo:
             continue
-        base = base_no_ramo(repo, ramo)
+        base = base_no_ramo(repo, ramo, a.versao)
         avisos = []
         ultima = ultima_principal(repo)
         if ultima and ultima not in (base, a.versao) and not contem(repo, ultima, ramo):
