@@ -129,8 +129,9 @@ O nectarcrm sempre entra. Os outros projetos seguem o `projetos.conf`:
 
 **Serviço entra pelo commit, não só pelo ticket.** Clone com commit no ramo de teste que a
 última principal dele não tem entra na versão mesmo sem ticket apto: a versão leva tudo que
-foi commitado. O plano lista quantos commits cada serviço traz. Projeto `fora` não entra;
-projeto fora do `projetos.conf` com commit cai em `A CONFIRMAR`.
+foi commitado. O plano lista em "Candidatos a tag" todo serviço com ramo de teste e quantos
+commits cada um traz. Projeto `fora` não entra; projeto fora do `projetos.conf` com commit
+cai em `A CONFIRMAR`; `SEM_SERVICO="slug ..."` tira um candidato desta versão.
 
 **Descrição do ticket de versão.** No preparo, a Insider sai com o crm e os serviços na
 versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sobrescrita.
@@ -157,8 +158,13 @@ versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sob
    desatualizados. Gere o material de novo com `--montagem` e refaça o agrupamento a partir
    do anterior. Depois rode o YouTrack com `--outros <json>`. O material da montagem vai até
    a tag.
-4. Monte todos os serviços que o plano lista em "Serviços na versão" (ver abaixo), com ou
-   sem ticket. Não deixe nenhum de fora.
+4. Serviços: sempre, em toda principal, leve a quem acionou a lista "Candidatos a tag" do
+   plano, como escolha múltipla (marcados por padrão os que têm commit e não têm AVISO).
+   Todo serviço com ramo de teste aparece nela, com ou sem ticket, com os commits desde a
+   última versão que o ramo dele já contém. Explique cada AVISO em uma linha: tag de versão
+   fora do ramo (alguém tagueou uma feature na master) ou tag desta versão que já existe.
+   Monte só os escolhidos (ver abaixo). Os que ficarem fora vão em `SEM_SERVICO="slug ..."`
+   na rodada do YouTrack, para a Insider do ticket de versão não listá-los.
 
 ## Serviço que sobe junto
 

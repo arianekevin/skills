@@ -241,16 +241,23 @@ servico)
   existe_tag "$nova" && erro "tag $nova já existe"
   alvo=$(git rev-parse "$ALPHA^{commit}")
 
-  anterior=$(versoes | grep -E "$RE_PRINCIPAL" | tail -1 || true)
+  # Base: a última versão (principal ou hotfix) que o ramo já contém. Tag de versão posta fora do
+  # ramo (ex.: numa feature na master) não trava: vira aviso, e quem acionou decide.
+  anterior=""
+  for t in $(versoes | sort -rV); do
+    git merge-base --is-ancestor "refs/tags/$t" "$alvo" && { anterior=$t; break; }
+  done
+  ultima=$(versoes | grep -E "$RE_PRINCIPAL" | tail -1 || true)
   echo "Serviço:          $(basename "$REPO")"
   echo "Tag (do CRM):     $nova"
   echo "Sobre:            $(git log -1 --format='%h %cs %s' "$alvo")"
   if [ -n "$anterior" ]; then
     [ "$(printf '%s\n%s\n' "$anterior" "$nova" | sort -V | tail -1)" = "$nova" ] \
       || erro "$nova é anterior à última do serviço ($anterior)"
-    git merge-base --is-ancestor "refs/tags/$anterior" "$alvo" \
-      || erro "$ALPHA não contém a versão anterior $anterior"
     echo "Desde $anterior:   $(git rev-list --count "refs/tags/$anterior..$alvo") commits"
+  fi
+  if [ -n "$ultima" ] && [ "$ultima" != "$anterior" ] && ! git merge-base --is-ancestor "refs/tags/$ultima" "$alvo"; then
+    echo "AVISO: $ultima está fora de $ALPHA ($(git log -1 --format='%h %an: %s' "refs/tags/$ultima"))"
   fi
   [ $plano = 1 ] && { echo "(plano: nada criado)"; exit 0; }
 

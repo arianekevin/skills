@@ -121,6 +121,27 @@ def ultima_principal(repo, antes_de=None):
     return tags[-1] if tags else None
 
 
+def contem(repo, tag, ramo):
+    """A tag existe e (com ramo) é ancestral dele."""
+    if subprocess.run(["git", "-C", repo, "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
+                      capture_output=True).returncode:
+        return False
+    return ramo is None or subprocess.run(
+        ["git", "-C", repo, "merge-base", "--is-ancestor", f"refs/tags/{tag}", ramo]).returncode == 0
+
+
+def base_no_ramo(repo, ramo):
+    """Última versão (principal ou hotfix) que o ramo já contém. Tag de versão posta fora do ramo
+    (ex.: numa feature na master) não serve de base. Sem nenhuma vYY.T.NNN, a tag mais próxima."""
+    tags = [t for t in git(repo, "tag", "-l", "v*").split() if RE_BACKEND.match(t)]
+    tags.sort(key=lambda t: [int(x) for x in t[1:].split(".")], reverse=True)
+    for t in tags:
+        if contem(repo, t, ramo):
+            return t
+    r = subprocess.run(["git", "-C", repo, "describe", "--tags", "--abbrev=0", ramo], capture_output=True, text=True)
+    return r.stdout.strip() or None
+
+
 def mais_recente_da(repo, principal):
     """A principal ou o hotfix mais recente dela (vYY.T.NNN.H)."""
     tags = [t for t in git(repo, "tag", "-l", f"{principal}*").split()
@@ -206,7 +227,7 @@ def material_outros(crm, crm_slug, clones, servicos, versao, entram):
         fim = tag if s == crm_slug and subprocess.run(
             ["git", "-C", repo, "rev-parse", "-q", "--verify", tag], capture_output=True).returncode == 0 \
             else ramo_de_teste(repo)
-        base = ultima_principal(repo, antes_de=versao)
+        base = ultima_principal(repo, antes_de=versao) if s == crm_slug else base_no_ramo(repo, ramo_de_teste(repo))
         for c in commits_da_versao(repo, base, fim):
             ids = set(re.findall(r"\b((?:%s)-\d+)\b" % "|".join(PROJETOS), f"{c['assunto']} {c['corpo']}".upper()))
             if ids & set(entram):  # cita um ticket da versão: o teste é o dele
@@ -402,7 +423,7 @@ def main():
             if not ramo:
                 continue
             buscar(repo)
-            base = ultima_principal(repo, antes_de=a.versao if s == crm_slug else None)
+            base = ultima_principal(repo, antes_de=a.versao) if s == crm_slug else base_no_ramo(repo, ramo)
             commits = ids_em_commits(repo, ramo, base)
         else:
             ramo, commits = None, set()
@@ -420,21 +441,33 @@ def main():
             if onde:
                 achados.setdefault(s, {})[i] = onde
 
-    # Serviço com commit no ramo de teste fora da última principal dele sobe, com ou sem ticket apto.
-    com_commit = {}  # slug -> commits da versão
+    # Candidatos a tag: todo serviço com ramo de teste, cada um com o que o ramo traz desde a
+    # última versão que ele já contém. Quem decide quais recebem a tag é quem acionou a skill.
+    candidatos = {}  # slug -> {"n", "base", "ramo", "avisos"}
     for s, repo in sorted(clones.items()):
         if s == crm_slug or conf.get(s, ("",))[0] == "fora":
             continue
         ramo = ramo_de_teste(repo)
-        if ramo:
-            n = len(commits_da_versao(repo, ultima_principal(repo), ramo))
-            if n:
-                com_commit[s] = n
-                achados.setdefault(s, {})
+        if not ramo:
+            continue
+        base = base_no_ramo(repo, ramo)
+        avisos = []
+        ultima = ultima_principal(repo)
+        if ultima and ultima not in (base, a.versao) and not contem(repo, ultima, ramo):
+            avisos.append(f"{ultima} está fora de {ramo}")
+        if contem(repo, a.versao, None):
+            avisos.append(f"já tem {a.versao}" + ("" if contem(repo, a.versao, ramo) else f", fora de {ramo}"))
+        n = len(commits_da_versao(repo, base, ramo))
+        candidatos[s] = {"n": n, "base": base, "ramo": ramo, "avisos": avisos}
+        if n:
+            achados.setdefault(s, {})
 
     # Quem sobe na segunda. Projeto com ticket ou commit que a lista não conhece trava a gravação.
-    a_confirmar = sorted(s for s in achados if s != crm_slug and s not in conf)
-    servicos = [conf[s][1] for s in sorted(achados) if s != crm_slug and conf.get(s, ("",))[0] == "entra"]
+    # SEM_SERVICO="slug1 slug2": candidatos que quem acionou deixou fora desta versão.
+    sem_servico = set(os.environ.get("SEM_SERVICO", "").split())
+    a_confirmar = sorted(s for s in achados if s != crm_slug and s not in conf and s not in sem_servico)
+    servicos = [conf[s][1] for s in sorted(achados)
+                if s != crm_slug and s not in sem_servico and conf.get(s, ("",))[0] == "entra"]
     origem, so_fora = {}, {}
     for s, ids in achados.items():
         situacao = "entra" if s == crm_slug else conf.get(s, ("a confirmar",))[0]
@@ -491,9 +524,15 @@ def main():
     sem = [i for i in fora if i not in so_fora and i not in mantidos]
     print(f"Ficam fora, sem commit nem PR em projeto com ambiente de teste ({len(sem)}): {' '.join(sem) or '-'}")
     print(f"Serviços na versão: {', '.join(servicos) or 'nenhum'}")
-    for s in sorted(com_commit):
-        if conf.get(s, ("",))[0] == "entra":
-            print(f"  {s}: {com_commit[s]} commit(s) desde {ultima_principal(clones[s])}; tag {a.versao} na ponta de {ramo_de_teste(clones[s])}")
+    print("Candidatos a tag (todo serviço com ramo de teste):")
+    for s, c in sorted(candidatos.items()):
+        if not c["n"]:
+            continue
+        situacao = "fora (SEM_SERVICO)" if s in sem_servico else conf.get(s, ("a confirmar",))[0]
+        avisos = f"  AVISO: {'; '.join(c['avisos'])}" if c["avisos"] else ""
+        print(f"  {s} [{situacao}]: {c['n']} commit(s) em {c['ramo']} desde {c['base'] or '-'}{avisos}")
+    parados = [s for s, c in sorted(candidatos.items()) if not c["n"]]
+    print(f"  sem commit desde a última versão: {', '.join(parados) or '-'}")
     if existente:
         print(f"Ticket de versão: {existente[0]['idReadable']} ({existente[0]['summary']}) — atualizar descrição")
     else:
