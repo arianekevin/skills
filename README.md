@@ -14,6 +14,7 @@ instale só o que faz sentido na máquina.
 | **bug-guardrail** | Cancela que não abre até causa raiz, cenários de teste e escopo existirem | NectarCRM (Struts + AngularJS) |
 | **revisar-pr-bitbucket** | Revisa PRs do Bitbucket em três perguntas — resolve, quebra, abre brecha — e aplica: comentário + request changes, ou aprovação | genérico (Bitbucket + YouTrack) |
 | **montar-versao** | Prepara a próxima versão de bugfix no YouTrack (bump, tickets aptos, ticket de versão) e monta a versão principal ou um hotfix só com os commits escolhidos, com tag e push | NectarCRM (padrões trocáveis por variável) |
+| **vigia** | Mod: painel que acompanha outra sessão do Claude Code e explica o que ela faz e por quê, com CUIDADO nas decisões sérias | genérico |
 
 ## Instalação
 
@@ -28,6 +29,7 @@ instale só o que faz sentido na máquina.
 /plugin install bug-guardrail@skills
 /plugin install revisar-pr-bitbucket@skills
 /plugin install montar-versao@skills
+/plugin install vigia@skills
 ```
 
 ## Padrões comuns
@@ -351,6 +353,20 @@ desfaz tudo e aponta os commits da alpha que mexem nos mesmos arquivos, candidat
 `ALPHA`, `POM` e `ARTIFACT`.
 
 ---
+
+## vigia
+
+Mod (não é skill): um painel ao lado do chat que acompanha outra sessão do Claude Code. Um script
+sem IA marca CUIDADO no que é irreversível, sai da máquina ou mexe em dado; o Haiku resume cada
+bloco — o que fez, por quê, e CUIDADO quando a sessão tomou sozinha uma decisão séria.
+
+```
+/vigia            # sessões ativas
+/vigia <id>       # liga o painel
+/vigia parar
+```
+
+Detalhes em [`vigia/README.md`](vigia/README.md).
 
 ## Licença
 

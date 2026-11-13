@@ -1,0 +1,11 @@
+{
+  "name": "vigia",
+  "version": "0.1.0",
+  "description": "Mod that watches another Claude Code session and explains, in a side pane, what it does and why; flags serious decisions (irreversible, leaves the machine, touches data) as CUIDADO.",
+  "types": "./types/index.d.ts",
+  "author": { "name": "arianecasas" },
+  "homepage": "https://github.com/arianekevin/skills",
+  "repository": "https://github.com/arianekevin/skills",
+  "license": "MIT",
+  "keywords": ["mod", "pane", "session", "monitor", "observability"]
+}
