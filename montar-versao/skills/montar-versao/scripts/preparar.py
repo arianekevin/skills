@@ -4,15 +4,15 @@
   preparar.py --versao vYY.T.NNN [--plano] [--montagem]
 
 1. Cria o valor <versão> no campo "Versão" (bundle compartilhado entre os projetos).
-2. Acha os tickets WEB/IN em "Apto para teste" que são do backend: têm commit na alpha
+2. Acha os tickets WEB/IN em "Apto para teste" ou "Aprovado" que são do backend: têm commit na alpha
    ainda fora da última versão, ou PR aberto para a alpha, no nectarcrm ou num serviço que
    sobe junto (sparknectarbi, automation-flow). Põe a versão no campo "Versão" deles.
    Serviço com commit no ramo de teste que a última principal dele não tem entra na versão
    mesmo sem ticket apto: a versão leva tudo que foi commitado. Projeto "fora" (reloaded) não.
 3. Cria (ou atualiza, se já existe) o ticket de versão no PID para o Hugo:
    "Versão - DD/MM", com DD/MM = próxima segunda.
-   Com --montagem, a linha "App" sai com a versão que está no insider hoje (a mais recente
-   da principal anterior, com hotfix).
+   A linha "App" sai com a versão que está no insider hoje (a mais recente da principal
+   anterior, com hotfix), já no preparo.
 
 4. --outros-material imprime em JSON os commits da versão sem ticket nela (LAT, DEL, sem
    ticket...). --outros <json> recebe o agrupamento em seções que o agente faz e cria ou
@@ -33,6 +33,8 @@ YT = os.environ.get("YOUTRACK_URL", "https://nectar.myjetbrains.com/youtrack").r
 BB = "https://api.bitbucket.org/2.0/repositories"
 PROJETOS = ("WEB", "IN")
 ESTADO = "Apto para teste"
+# Também entra ticket já aprovado com commit na versão: o código dele sobe nela de qualquer jeito.
+ESTADOS_ENTRAM = (ESTADO, "Aprovado")
 CAMPO = "Versão"
 PID = {"Type": "Rotina", "Projeto": "Release e CI/CD", "Priority": "1 - Urgente"}
 OUTROS_LIMITE = int(os.environ.get("OUTROS_LIMITE", "8"))  # itens num ticket que junta seções
@@ -227,11 +229,13 @@ def material_outros(crm, crm_slug, clones, servicos, versao, entram):
         tag = f"refs/tags/{versao}"
         fim = tag if s == crm_slug and subprocess.run(
             ["git", "-C", repo, "rev-parse", "-q", "--verify", tag], capture_output=True).returncode == 0 \
-            else ramo_de_teste(repo)
-        base = ultima_principal(repo, antes_de=versao) if s == crm_slug else base_no_ramo(repo, ramo_de_teste(repo), versao)
+            else ramo_da_versao(repo, s)
+        base = ultima_principal(repo, antes_de=versao) if s == crm_slug else base_no_ramo(repo, ramo_da_versao(repo, s), versao)
         for c in commits_da_versao(repo, base, fim):
             ids = set(re.findall(r"\b((?:%s)-\d+)\b" % "|".join(PROJETOS), f"{c['assunto']} {c['corpo']}".upper()))
-            if ids & set(entram):  # cita um ticket da versão: o teste é o dele
+            # Outros ajustes = o que entrou sem tracking: commit que cita qualquer ticket
+            # (WEB, IN, LAT, DEL, PRD...) é testado pelo dele, esteja ou não nesta versão.
+            if re.search(r"\b[A-Z][A-Z0-9]+-\d+\b", f"{c['assunto']} {c['corpo']}"):
                 continue
             mat.append({"repo": s, "sha": c["sha"], "assunto": c["assunto"], "arquivos": c["arquivos"][:20]})
     return mat
@@ -320,11 +324,24 @@ def carregar_conf():
     for linha in open(CONF):
         linha = linha.split("#")[0].strip()
         if linha:
-            partes = linha.split(None, 2)
+            partes = linha.split()
             if len(partes) < 2 or partes[1] not in ("entra", "fora"):
                 erro(f"{CONF}: linha inválida: {linha}")
-            conf[partes[0].lower()] = (partes[1], partes[2] if len(partes) > 2 else partes[0])
+            # ramo=<branch>: a versão do serviço sai desse ramo, não do de teste (ex.: nectar-auth,
+            # cuja alpha leva o que não vai para produção; a versão é master + o fix).
+            for x in partes[2:]:
+                if x.startswith("ramo="):
+                    RAMO_DA_VERSAO[partes[0].lower()] = "origin/" + x[5:]
+            resto = [x for x in partes[2:] if not x.startswith("ramo=")]
+            conf[partes[0].lower()] = (partes[1], " ".join(resto) or partes[0])
     return conf
+
+
+RAMO_DA_VERSAO = {}  # slug -> ramo de onde a versão sai, quando não é o de teste
+
+
+def ramo_da_versao(repo, slug):
+    return RAMO_DA_VERSAO.get(slug) or ramo_de_teste(repo)
 
 
 # ---------- YouTrack ----------
@@ -430,7 +447,9 @@ def main():
     conf = carregar_conf()
 
     # 1. Tickets aptos e os projetos onde cada um tem commit ou PR.
-    aptos = yt("issues", {"query": f"project: {', '.join(PROJETOS)} State: {{{ESTADO}}}",
+    desde = (datetime.date.today() - datetime.timedelta(days=90)).isoformat()
+    estados = ", ".join("{%s}" % e for e in ESTADOS_ENTRAM)
+    aptos = yt("issues", {"query": f"project: {', '.join(PROJETOS)} State: {estados} updated: {desde} .. Today",
                           "fields": "idReadable,summary,description,customFields(name,value(name)),comments(text)",
                           "$top": 500})
     por_id = {i["idReadable"]: i for i in aptos}
@@ -465,6 +484,9 @@ def main():
             onde = (["commit"] if i in commits else []) + (["PR " + ", ".join(f"#{n}" for n in prs[i])] if i in prs else [])
             if not onde and i in citados.get(s, ()) and s not in clones:
                 onde = ["citado no ticket"]
+            # Aprovado só entra com commit novo no ramo: PR aberto ou citação não bastam.
+            if campo(por_id[i], "State") != ESTADO and "commit" not in onde:
+                onde = []
             if onde:
                 achados.setdefault(s, {})[i] = onde
 
@@ -474,7 +496,7 @@ def main():
     for s, repo in sorted(clones.items()):
         if s == crm_slug or conf.get(s, ("",))[0] == "fora":
             continue
-        ramo = ramo_de_teste(repo)
+        ramo = ramo_da_versao(repo, s) if ramo_de_teste(repo) else None
         if not ramo:
             continue
         base = base_no_ramo(repo, ramo, a.versao)
@@ -507,14 +529,16 @@ def main():
     outra_linha = [i for i in entram if campo(por_id[i], CAMPO) and campo(por_id[i], CAMPO) != a.versao
                    and not RE_BACKEND.match(campo(por_id[i], CAMPO)) and i not in a.trocar]
     # Confirmado que fica na outra linha: sai desta versão sem mexer no campo.
-    mantidos = [i for i in outra_linha if i in a.manter]
+    # Aprovado na outra linha já foi testado nela: fica lá, sem perguntar.
+    mantidos = [i for i in outra_linha if i in a.manter or campo(por_id[i], "State") != ESTADO]
     entram = [i for i in entram if i not in mantidos]
     outra_linha = [i for i in outra_linha if i not in mantidos]
 
     if a.outros_material or a.outros:
         if a_confirmar or outra_linha:
             erro("resolva o que está A CONFIRMAR antes dos Outros ajustes", 5)
-        servicos_slug = [s for s in sorted(achados) if s != crm_slug and conf.get(s, ("",))[0] == "entra"]
+        servicos_slug = [s for s in sorted(achados) if s != crm_slug and conf.get(s, ("",))[0] == "entra"
+                         and s not in sem_servico]
         mat = material_outros(crm, crm_slug, clones, servicos_slug, a.versao, entram)
         if a.outros_material:
             json.dump(mat, sys.stdout, ensure_ascii=False, indent=1)
@@ -529,10 +553,10 @@ def main():
     # Sem o valor no campo, a busca por ele é recusada pelo YouTrack: não há ticket de versão ainda.
     existente = yt("issues", {"query": f"project: PID {CAMPO}: {a.versao}",
                               "fields": "idReadable,summary,description", "$top": 5}) if tem_valor else []
-    app = None
-    if a.montagem:
-        anterior = ultima_principal(crm, antes_de=a.versao)
-        app = mais_recente_da(crm, anterior) if anterior else None
+    # App = o que está no insider hoje: a principal anterior com o hotfix mais recente criado até
+    # agora. Hotfix que vier depois quem acionou atualiza à mão (linha preenchida não é trocada).
+    anterior = ultima_principal(crm, antes_de=a.versao)
+    app = mais_recente_da(crm, anterior) if anterior else None
     desc = descricao(a.versao, servicos, app)
     if existente:
         desc = mesclar(existente[0].get("description"), desc)
@@ -557,7 +581,8 @@ def main():
             continue
         situacao = "fora (SEM_SERVICO)" if s in sem_servico else conf.get(s, ("a confirmar",))[0]
         avisos = f"  AVISO: {'; '.join(c['avisos'])}" if c["avisos"] else ""
-        print(f"  {s} [{situacao}]: {c['n']} commit(s) em {c['ramo']} desde {c['base'] or '-'}{avisos}")
+        montar = f"  (montar com ALPHA={c['ramo']})" if s in RAMO_DA_VERSAO else ""
+        print(f"  {s} [{situacao}]: {c['n']} commit(s) em {c['ramo']} desde {c['base'] or '-'}{avisos}{montar}")
     parados = [s for s, c in sorted(candidatos.items()) if not c["n"]]
     print(f"  sem commit desde a última versão: {', '.join(parados) or '-'}")
     if existente:

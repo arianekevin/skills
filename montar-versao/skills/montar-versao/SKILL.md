@@ -69,13 +69,14 @@ campo Versão, o campo Versão dos tickets e o ticket de versão.
    Rodar de novo é seguro. Bump feito não se refaz, e ticket que já está na versão fica
    como está. O ticket de versão é atualizado, não duplicado.
 4. **Outros ajustes.** Depois que nada está `A CONFIRMAR`, cubra o que sobe sem ticket na
-   versão: commits de LAT, DEL, IN de outra linha, ticket que não está apto, commit sem
-   ticket, e os serviços que entram. Para cada área, o QA recebe o que pode ter sido
+   versão: só o que entrou sem tracking, os commits que não citam ticket nenhum (do CRM e
+   dos serviços que entram). Commit que cita ticket (WEB, IN, LAT, DEL, PRD...) é testado
+   pelo dele, mesmo fora desta versão. Para cada área, o QA recebe o que pode ter sido
    impactado. Não é o detalhe do commit. Exemplo: um LAT mexeu no filtro da listagem de
    contatos, então o item é "Listagens de contatos".
    1. Material: `REPO=<clone> python3 scripts/preparar.py --versao <versão>
       --outros-material [--manter ...] [--trocar ...] > material.json`. São os commits da
-      versão, com assunto e arquivos, sem os que citam um ticket dela. Commit que cita um
+      versão, com assunto e arquivos, sem os que citam algum ticket. Commit que cita um
       ticket da versão é testado pelo dele.
    2. Mapeie os pontos a testar. Cada ponto entra numa seção só, a do CRM mais afetada
       (Contatos, Oportunidades, Tarefas, Configurações...). Vários commits podem virar um
@@ -112,7 +113,7 @@ campo Versão, o campo Versão dos tickets e o ticket de versão.
    título. Se o agrupamento mudou, o ticket com título que não existe mais sai como
    `SOBROU`: leve isso a quem acionou.
 
-**Quais tickets entram.** WEB e IN em "Apto para teste" com commit no ramo de teste do
+**Quais tickets entram.** WEB e IN em "Apto para teste" ou "Aprovado" com commit no ramo de teste do
 projeto que a última versão dele não tem, ou com PR aberto para esse ramo. O ramo de teste
 é `alpha`, ou `homolog` quando o projeto não tem alpha (ex.: for-whats). Os projetos vêm:
 - dos clones locais do workspace (irmãos do nectarcrm);
@@ -121,6 +122,9 @@ projeto que a última versão dele não tem, ou com PR aberto para esse ramo. O 
 Projeto sem clone só é lido pelos PRs e pela citação.
 
 O nectarcrm sempre entra. Os outros projetos seguem o `projetos.conf`:
+- `ramo=<branch>` na linha do projeto: a versão do serviço sai desse ramo, não do de teste.
+  O nectar-auth usa `ramo=master` (a alpha dele leva a rota do NDesk, que não vai para
+  produção); na montagem, `ALPHA=origin/master montar.sh servico`.
 - `entra`: o ticket entra na versão, e o projeto ganha a linha `Imagem do serviço <rótulo>:
   <versão>` no ticket de versão. Na montagem, o projeto recebe a tag do CRM
   (`montar.sh servico`).
@@ -134,7 +138,9 @@ commits cada um traz. Projeto `fora` não entra; projeto fora do `projetos.conf`
 cai em `A CONFIRMAR`; `SEM_SERVICO="slug ..."` tira um candidato desta versão.
 
 **Descrição do ticket de versão.** No preparo, a Insider sai com o crm e os serviços na
-versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sobrescrita.
+versão nova. A App sai com a imagem do crm que está no insider hoje: a principal anterior
+com o hotfix mais recente já criado. Hotfix que vier depois, quem acionou atualiza à mão.
+Vue fica "a definir". Linha preenchida à mão nunca é sobrescrita.
 
 ## Versão principal
 
@@ -146,8 +152,8 @@ versão nova. App e Vue ficam "a definir". Linha preenchida à mão nunca é sob
    (o pom da ponta já está na versão), não há commit novo: a tag vai na ponta.
 3. Em seguida, o script refaz a varredura do preparo no YouTrack com `--montagem`:
    - põe na versão os tickets que ficaram aptos durante a semana;
-   - preenche a linha App do ticket de versão com a versão que está no insider (a mais
-     recente da principal anterior, com hotfix).
+   - preenche a linha App do ticket de versão, se ainda estiver "a definir", com a versão
+     que está no insider (a mais recente da principal anterior, com hotfix).
 
    Vue continua "a definir": não há onde ler essa tag. Se sair `A CONFIRMAR` (saída 5),
    a tag já subiu. Resolva como no preparo e rode só o YouTrack:
