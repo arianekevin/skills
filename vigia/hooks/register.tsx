@@ -191,6 +191,45 @@ function ligarRelogio($: EngineInterface) {
   cancelar = () => t.cancel()
 }
 
+async function rodarComando($: EngineInterface, arg: string): Promise<{ text: string }> {
+  ligarRelogio($)
+  if (arg === 'parar') {
+    await update($, alvo, () => null)
+    await update($, pendentes, () => [])
+    return { text: 'Vigia parado.' }
+  }
+  if (arg === 'limpar') {
+    await update($, itens, () => [])
+    return { text: 'Painel limpo.' }
+  }
+  if (!arg) {
+    const eu = await $.session.id()
+    const res = await $.process.run(['python3', '-I', script($), 'listar', eu])
+    if (res.exitCode !== 0) throw new Error(res.stderr.trim().split('\n').pop() || `python3 saiu com ${res.exitCode}`)
+    const lista = lerJson<{ id: string; mexida: string; ultimo_pedido: string }[]>(res.stdout) ?? []
+    if (lista.length === 0) return { text: 'Nenhuma sessão ativa nas últimas 6 h.' }
+    return {
+      text:
+        'Sessões ativas (use /vigia <id>):\n' +
+        lista.map(s => `  ${s.id}  ${s.mexida}  ${s.ultimo_pedido || '—'}`).join('\n'),
+    }
+  }
+  const res = await $.process.run(['python3', '-I', script($), 'achar', arg])
+  if (res.exitCode !== 0) throw new Error(res.stderr.trim().split('\n').pop() || `python3 saiu com ${res.exitCode}`)
+  const caminho = lerJson<{ caminho: string }>(res.stdout)?.caminho
+  if (!caminho) return { text: `Não achei sessão com id ${arg}.` }
+  const id = caminho.split('/').pop()!.slice(0, 8)
+  await update($, alvo, () => ({ caminho, id }))
+  await update($, offset, () => -1)
+  await update($, pendentes, () => [])
+  await update($, pedido, () => '')
+  await update($, agora, () => '')
+  await juntar($, [{ tipo: 'aviso', hora: hhmm(), texto: `vigiando a sessão ${id}` }])
+  await $.ui.open({ id: PANE, title: `Vigia · ${id}` })
+  void tick($)
+  return { text: `Vigiando ${id}. O painel resume cada bloco; CUIDADO vira notificação no Mac.` }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -203,42 +242,15 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Toda falha vira resposta: um hook que lança some como "no command.run hook answered it",
+  // sem dizer a causa (python3 ausente, $.process fora do CLI, relógio indisponível).
   on('command.run', { command: 'vigia' }, async ($, e) => {
-    ligarRelogio($)
-    const arg = (e.args || '').trim()
-    if (arg === 'parar') {
-      await update($, alvo, () => null)
-      await update($, pendentes, () => [])
-      return { text: 'Vigia parado.' }
+    try {
+      return await rodarComando($, (e.args || '').trim())
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return { text: `Vigia falhou: ${msg}\nPrecisa do Claude Code no terminal (CLI) e de python3 no PATH.` }
     }
-    if (arg === 'limpar') {
-      await update($, itens, () => [])
-      return { text: 'Painel limpo.' }
-    }
-    if (!arg) {
-      const eu = await $.session.id()
-      const res = await $.process.run(['python3', '-I', script($), 'listar', eu])
-      const lista = lerJson<{ id: string; mexida: string; ultimo_pedido: string }[]>(res.stdout) ?? []
-      if (lista.length === 0) return { text: 'Nenhuma sessão ativa nas últimas 6 h.' }
-      return {
-        text:
-          'Sessões ativas (use /vigia <id>):\n' +
-          lista.map(s => `  ${s.id}  ${s.mexida}  ${s.ultimo_pedido || '—'}`).join('\n'),
-      }
-    }
-    const res = await $.process.run(['python3', '-I', script($), 'achar', arg])
-    const caminho = lerJson<{ caminho: string }>(res.stdout)?.caminho
-    if (!caminho) return { text: `Não achei sessão com id ${arg}.` }
-    const id = caminho.split('/').pop()!.slice(0, 8)
-    await update($, alvo, () => ({ caminho, id }))
-    await update($, offset, () => -1)
-    await update($, pendentes, () => [])
-    await update($, pedido, () => '')
-    await update($, agora, () => '')
-    await juntar($, [{ tipo: 'aviso', hora: hhmm(), texto: `vigiando a sessão ${id}` }])
-    await $.ui.open({ id: PANE, title: `Vigia · ${id}` })
-    void tick($)
-    return { text: `Vigiando ${id}. O painel resume cada bloco; CUIDADO vira notificação no Mac.` }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
