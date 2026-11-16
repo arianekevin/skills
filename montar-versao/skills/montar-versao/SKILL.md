@@ -194,8 +194,12 @@ Quando o pedido inclui um serviço (ex.: "gera a versão no crm e no sparknectar
    Bitbucket os commits e o `merge_commit` de cada PR mergeado: squash junta tudo num
    commit só; rebase deixa um commit por correção, e todos entram.
    Commit que não está na alpha não entra: é preciso passar pela esteira antes.
-2. **Base.** Por padrão, a versão mais recente de todas (principal ou hotfix dela).
-   Hotfix de uma principal mais antiga: `--base vYY.T.NNN`.
+2. **Ambiente e base.** Se o pedido não diz para qual ambiente, pergunte antes de
+   montar (uma pergunta, com opções): insider, app ou os dois. Insider = linha da
+   principal mais recente; app = linha da principal anterior; os dois = um hotfix em
+   cada linha, com os mesmos commits. "Pro insider e app" já diz: são os dois, sem
+   perguntar. Principal mais recente: a versão mais recente de todas (principal ou
+   hotfix dela). Principal anterior: `--base vYY.T.NNN`.
 3. `montar.sh hotfix --plano ...` e mostre base, número novo, o que aplica e o que
    pula (já está na base, por SHA ou por patch igual).
 4. `montar.sh hotfix ...` cria, num worktree em `.claude/worktrees/hotfix/<versão>`,
