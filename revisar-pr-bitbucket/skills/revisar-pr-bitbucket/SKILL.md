@@ -24,7 +24,7 @@ O teste: se o dev responder "não vou mexer nisso", você seguraria o merge? Se 
 - caso de borda improvável, robustez que "seria bom ter", exatidão de comportamento auxiliar (desfazer, log, histórico) que continua funcionando;
 - pedido de processo: anexar script ou SQL, registrar data, documentar, provar que rodou, escrever teste;
 - preferência de como resolver, quando o jeito do dev resolve;
-- o que já era assim antes do PR e o ticket não pede para mudar (confira na base: `git log` do arquivo, `git show <merge-base>:<arquivo>`).
+- o que já era assim antes do PR e o ticket não pede para mudar (confira na base: `git log` do arquivo, `git show <merge-base>:<arquivo>`). Exceção: código antigo que o PR passa a chamar de um lugar novo é do PR naquele uso (ex.: consulta sem filtro de tenant, abaixo).
 
 Na dúvida entre achado e preciosismo, é preciosismo.
 
@@ -38,7 +38,7 @@ Leia **`PADROES.md`** (ao lado deste arquivo) antes de agir. Dois têm peso aqui
 
 ### Contexto do projeto
 
-Se existir `~/.claude/revisar-pr-bitbucket/contexto/<slug-do-repo>.md`, leia antes de revisar: diz onde os bugs se escondem naquele sistema e que regras de domínio **não** são achado. Formato e motivo em `references/contexto-de-projeto.md`. Sem arquivo, siga só o método abaixo.
+Se existir `~/.claude/revisar-pr-bitbucket/contexto/<slug-do-repo>.md`, leia antes de revisar: diz onde os bugs se escondem naquele sistema e que regras de domínio **não** são achado. Se ele listar armadilhas de ambiente (o que passa no teste e falha fora do localhost ou no banco real), rode no diff a busca de cada uma e aplique o que ela manda. Formato e motivo em `references/contexto-de-projeto.md`. Sem arquivo, siga só o método abaixo.
 
 ## Pré-requisitos
 
@@ -94,11 +94,16 @@ Quem lê a explicação do autor antes do código tende a confirmar a tese dele 
 - O bug deixou dado quebrado no banco? Então o fix precisa corrigir o que já está gravado (script, migration, ou o dev dizer no PR ou no ticket que o reparo foi feito direto no banco), não só o que vier depois do deploy — senão o cliente do ticket continua com o erro. E quem lê esse dado (desfazer, histórico, relatório) precisa continuar funcionando depois da correção.
 - Refaça o caminho de quem vai testar o ticket. Do "como reproduzir" (tela ou endpoint), liste as entradas que levam ao sintoma — a mesma tela costuma ter mais de uma (página cheia, painel lateral, edição rápida, modal; cada uma pode chamar outra rota) — e as variantes de dado que o ticket ou a ação implicam (formato com e sem máscara, campo vazio, criar, editar e desativar, registro removido). Confira cada uma contra o diff. A que o PR não cobre e cai no mesmo sintoma é `parcial`.
 - Siga o caminho de chamada do que mudou: quem mais chama? Há outra porta (outra versão da API, tela antiga, ação em massa, importação, integração, webhook, job) que chega na mesma gravação e continua com o bug ou passa a falhar?
+- PR que acrescenta ou muda checagem de permissão ou atribuição: a checagem certa sobre o usuário errado não protege nada, e a mesma ação costuma ter outra porta com regra própria. Antes de dar a permissão por certa, traga as duas provas:
+  - (a) para cada chamador previsto da rota (sessão da tela, token de API, chamada interna de outro serviço, OAuth…), o ponto que define o usuário, com `arquivo:linha`, e qual usuário chega ao código;
+  - (b) a mesma ação na porta irmã (a outra versão da API, a tela), com a regra de lá e `arquivo:linha`, dizendo se é igual ou diferente e por quê. Aqui a porta irmã é o critério da própria regra, não "fora do escopo": diferente sem razão no ticket é achado `seguranca`.
+  Faltando uma das duas, é ⚠️ `seguranca` com o que faltou olhar em "(a confirmar: …)".
 - Mudança de status HTTP ou de campo de resposta: quem consome (front, SDK, mobile, API pública)? Leia o arquivo que consome, inclusive em outro repositório, antes de dizer que "na tela não afeta".
 - **PR só de tela** (nenhuma mudança fora de JS, HTML, CSS ou texto): nenhum teste automático vai provar o caminho, então a prova é sua. Liste cada função entre o ponto de entrada (init, clique, rota) e a chamada que o ticket precisa que aconteça, na ordem em que rodam. Para cada dado que vem do servidor nesse caminho, diga o que acontece com nulo, campo ausente e lista vazia (`.includes`, `.length`, acesso a propriedade). Uma exceção antes da chamada, engolida por um `.catch`, é o mesmo bug do ticket. Sem essa lista, a nota de `ticket` não passa de 6.
 - Correção ou ganho de desempenho que depende de índice, migration ou configuração de banco: leia a migration (portão de tamanho, "criar à mão", `CONCURRENTLY`). Se o índice ou a migration não roda sozinho no deploy, registre em `depende_de` (`{"repo": "ambiente", "ref": "<índice ou migration>", "o_que": "conferir que existe no ambiente de teste e em produção"}`).
 - Catch que só loga + nova validação = dado perdido em silêncio (lead, importação, webhook).
 - Nova consulta: tem paginação/limite? Roda por linha? Filtra tenant? Concatena valor da request? Segura transação aberta enquanto chama serviço externo?
+- Consulta sobre dado que pertence a uma conta (configuração, histórico, cadastro) que o PR cria **ou passa a chamar de um lugar novo**, mesmo que ela seja anterior ao PR: mostre no `porque` de `seguranca` o filtro de tenant dela, com `arquivo:linha`. Se ela pega "o primeiro" (limite 1, ordenada por id) sem filtrar a conta, num banco com várias contas devolve a linha de outra: é achado `seguranca` e o veredito é ajuste.
 - Campo novo mapeado no ORM entra no UPDATE de linha inteira dos fluxos antigos? (Um fluxo que regrava a entidade inteira desfaz o que outro gravou por SQL.)
 - "Quebra" é contra o que o cliente usa hoje (produção, regra de produto), não contra um estado intermediário da branch de destino criado por outro PR ainda não liberado. Antes de chamar de regressão, confira se aquilo já funcionava (`git log` do arquivo).
 - Teste que o PR altera: se ele afirmava exatamente o comportamento que o ticket manda mudar (o bug estava fixado no teste), trocar essa asserção pela do ticket é parte da correção, não `quebra_teste`. É achado o teste apagado, afrouxado ou ignorado, ou a asserção trocada sobre outro comportamento.
@@ -204,6 +209,8 @@ Ressalva que você não conferiu não é 7–9. "A conferir no ambiente", "o tes
 Por isso, todo `porque` de nota 7–9 que traz ressalva ("fora do escopo", "assume", "não afeta", "falta validar", "deve") termina com a prova: `conferido em <arquivo:linha>` ou `não conferido`. Com `não conferido`, a nota é 6 ou menos e o achado vai junto. Duas ressalvas pedem uma busca antes da prova:
 - **"Fora do escopo" ou "outra porta não afeta":** procure com `git grep` a mesma gravação ou chamada que o PR corrigiu nos caminhos irmãos (as outras integrações do mesmo tipo, a outra versão da API, a ação em massa) e liste o que achou no `porque`. Porta irmã com o mesmo defeito, no caminho do ticket, é `parcial`; fora do caminho do ticket, se o defeito é de segurança, vai em `portas_abertas`.
 - **"Assume que X é a causa":** confira X contra o sintoma do ticket (stack, log, dado). Se não fecha, a nota de `ticket` não passa de 6.
+
+PR de permissão sem as duas provas do item "PR que acrescenta ou muda checagem de permissão" (Como revisar): `seguranca` 6 ou menos.
 
 O registro é estatística da esteira, não muda o veredito nem o comentário.
 

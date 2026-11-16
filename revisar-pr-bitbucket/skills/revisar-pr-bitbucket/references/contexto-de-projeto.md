@@ -23,6 +23,7 @@ de domínio que derrubou um achado), sugira acrescentar uma linha ao arquivo —
 - **Permissão:** o que cada anotação/gate realmente checa, configurações de conta que mudam o filtro,
   consultas que devolvem registro excluído, como o tenant é filtrado.
 - **Banco:** padrões que já travaram produção (listagem sem paginação, concatenação em HQL/SQL, filtro sem índice).
+- **Armadilhas de ambiente:** o que passa no teste e falha fora do localhost ou no banco real (debug do front desligado em produção, gravação sem transação aberta). Cada uma com a busca no diff e o que fazer quando ela acha; a lista cresce quando um escape se repetir.
 - **Regras de domínio que NÃO são achado:** fatos que já derrubaram uma revisão ("fluxo X é legado", "usuário Y não opera").
 - **Consumidores do contrato:** quem chama a API (front, SDK, mobile, integrações) — para avaliar mudança de status HTTP.
 

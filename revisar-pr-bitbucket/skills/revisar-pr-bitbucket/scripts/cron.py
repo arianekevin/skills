@@ -14,7 +14,8 @@ changes que sai no fim pesa mais que ela.
 `--calibrar [gabarito.jsonl]` mede a régua: revisa de novo PRs já decididos, cada um no commit em que foi
 julgado, sem escrever nada (BITBUCKET_SO_LEITURA), e compara com o veredito certo. Para rodar à mão quando
 trocar o modelo (REVISOR_MODELO) ou mexer na SKILL.md. Gabarito padrão: $REVISOR_DIR/gabarito.jsonl, uma
-linha por PR: {"pr": 123, "commit": "<hash>", "veredito": "aprovado | ajuste", "categorias": [...], "nota": "..."}.
+linha por PR: {"pr": 123, "commit": "<hash>", "veredito": "aprovado | ajuste", "categorias": [...], "nota": "..."}
+("base" opcional; sem ele, o merge-base com o destino, ou o pai do commit se ele já está no destino).
 Resultado em $REVISOR_DIR/calibracao/<data>-<plugin>-<modelo>.jsonl e o resumo na saída.
 
 `--varrer [--aplicar]` é a passada diária nos PRs abertos cujo ticket já fechou: todos os tickets do PR
@@ -480,8 +481,11 @@ def calibrate(answers):
             missing.append(pr)
             continue
         commit = c.stdout.strip()
-        base = subprocess.run(["git", "merge-base", commit, f"origin/{DEST}"], cwd=CLONE, capture_output=True, text=True).stdout.strip()
-        when = subprocess.run(["git", "show", "-s", "--format=%cI", commit], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        base = v.get("base") or subprocess.run(["git", "merge-base", commit, f"origin/{DEST}"], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        if base == commit:  # já mergeado por rebase: o merge-base é o próprio commit e o diff sairia vazio
+            base = subprocess.run(["git", "rev-parse", commit + "^"], cwd=CLONE, capture_output=True, text=True).stdout.strip()
+        # data do autor: o rebase do merge troca a do commit para depois da revisão
+        when = subprocess.run(["git", "show", "-s", "--format=%aI", commit], cwd=CLONE, capture_output=True, text=True).stdout.strip()
         lines.append(f"- #{pr}: commit {commit[:12]}, base {base[:12]}, data do commit {when}")
     if missing:
         log(f"calibração: commit fora do clone, ficam de fora: {', '.join('#' + pr for pr in missing)}")
