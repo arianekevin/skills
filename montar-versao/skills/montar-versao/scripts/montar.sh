@@ -5,6 +5,7 @@
 #   montar.sh principal [--plano]
 #   montar.sh hotfix    [--plano] [--base <tag>] <commit>...
 #   montar.sh servico   [--plano] <tag-do-crm>
+#   montar.sh promover  [--plano] <tag-principal>
 #
 # Preparar: calcula a próxima principal, faz o bump do pom na alpha (push, sem tag) e chama
 # preparar.py: valor no campo Versão do YouTrack, tickets aptos do backend e ticket de versão.
@@ -17,9 +18,12 @@
 # a tag. O hotfix não mexe no pom. --plano mostra o que faria e não cria nada.
 # Serviço (rodado no clone do serviço que sobe junto com o CRM): põe a tag do CRM na
 # ponta da origin/alpha do serviço, sem bump. O número é sempre o do CRM, mesmo pulando.
+# Promover (roda sozinho no fim da principal e do serviço; SEM_PROMOVER=1 pula): insider vai
+# para a tag nova e master para a principal anterior (nunca hotfix), só por fast-forward.
 #
 # Saída: 0 ok · 2 uso/validação · 3 conflito no cherry-pick (nada fica criado) ·
-#        4 falha de API do YouTrack/Bitbucket · 5 projeto ou ticket a confirmar (nada gravado no YouTrack).
+#        4 falha de API do YouTrack/Bitbucket · 5 projeto ou ticket a confirmar (nada gravado no YouTrack) ·
+#        6 master ou insider não é fast-forward (a branch divergente fica como está).
 set -euo pipefail
 
 REPO=${REPO:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
@@ -72,7 +76,47 @@ versao_no_pom() {
   git show "$1:$POM" | perl -0ne "print \$1 if m{<artifactId>$ARTIFACT</artifactId>\s*<version>([^<]+)}"
 }
 
+# Master na principal anterior, insider na nova. Sem hotfix: sempre a tag principal.
+# Só fast-forward; branch que não existe no origin é pulada; divergência não força (saída 6).
+promover() {
+  local nova=$1 anterior b alvo atual refs=() divergiu=0
+  anterior=$(versoes | grep -E "$RE_PRINCIPAL" | grep -vx "$nova" \
+    | while read -r t; do [ "$(printf '%s\n%s\n' "$t" "$nova" | sort -V | head -1)" = "$t" ] && echo "$t"; done | tail -1)
+  echo
+  for b in master insider; do
+    case $b in master) alvo=$anterior ;; insider) alvo=$nova ;; esac
+    if ! atual=$(git rev-parse -q --verify "refs/remotes/origin/$b^{commit}"); then
+      echo "$b: não existe no origin, pulada"; continue
+    fi
+    [ -n "$alvo" ] || { echo "$b: sem principal anterior a $nova, fica como está"; continue; }
+    local sha; sha=$(git rev-parse "refs/tags/$alvo^{commit}")
+    if [ "$atual" = "$sha" ]; then
+      echo "$b: já em $alvo"
+    elif git merge-base --is-ancestor "$atual" "$sha"; then
+      echo "$b: $(git describe --tags --exact-match "$atual" 2>/dev/null || git rev-parse --short "$atual") → $alvo"
+      refs+=("$sha:refs/heads/$b")
+    else
+      echo "DIVERGE: $b ($(git log -1 --format='%h %s' "$atual")) não é ancestral de $alvo; fica como está" >&2
+      git log --format='  %h %cs %an: %s' "$sha..$atual" | head -10 >&2
+      divergiu=1
+    fi
+  done
+  [ $plano = 1 ] && return 0
+  if [ ${#refs[@]} -gt 0 ]; then
+    git push -q origin "${refs[@]}" || { echo "ERRO: push de master/insider recusado" >&2; exit 6; }
+    git fetch -q origin
+  fi
+  [ $divergiu = 0 ] || exit 6
+}
+
 case $modo in
+promover)
+  [ ${#args[@]} -eq 1 ] || erro "informe a tag principal (ex.: v26.4.010)"
+  grep -qE "$RE_PRINCIPAL" <<<"${args[0]}" || erro "${args[0]} não é principal (hotfix não vai para master/insider)"
+  existe_tag "${args[0]}" || erro "tag ${args[0]} não existe"
+  promover "${args[0]}"
+  ;;
+
 preparar)
   [ ${#args[@]} -eq 0 ] || erro "o preparo sai sempre da ponta da $ALPHA"
   nova=$(proxima_principal)
@@ -128,7 +172,7 @@ principal)
   if [ $ja_tem_bump = 1 ]; then
     echo "Pom:              já em $versao_pom (preparo fez o bump); a tag vai na ponta"
   fi
-  [ $plano = 1 ] && { echo "(plano: nada criado)"; exit 0; }
+  [ $plano = 1 ] && { [ -n "$anterior" ] && echo "Depois: insider → $nova, master → $anterior (fast-forward)"; echo "(plano: nada criado)"; exit 0; }
 
   if [ $ja_tem_bump = 1 ]; then
     git tag "$nova" "$alvo"
@@ -151,6 +195,7 @@ principal)
     erro "push recusado (a ${ALPHA#origin/} andou?); nada subiu. Rode de novo"
   fi
   echo "Pronto: tag $nova e ${ALPHA#origin/} no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
+  [ -n "${SEM_PROMOVER:-}" ] || promover "$nova"
   # YouTrack: tickets que ficaram aptos na semana e a linha App do ticket de versão.
   [ -n "${SEM_YOUTRACK:-}" ] || { echo; REPO="$REPO" python3 "$AQUI/preparar.py" --versao "$nova" --montagem ${TROCAR:+--trocar $TROCAR} ${MANTER:+--manter $MANTER} ${OUTROS:+--outros $OUTROS}; }
   ;;
@@ -264,10 +309,11 @@ servico)
   git tag "$nova" "$alvo"
   git push -q origin "refs/tags/$nova"
   echo "Pronto: tag $nova no origin, em $(git log -1 --format='%h %s' "refs/tags/$nova")"
+  [ -n "${SEM_PROMOVER:-}" ] || promover "$nova"
   ;;
 
 *)
-  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
   ;;
 esac

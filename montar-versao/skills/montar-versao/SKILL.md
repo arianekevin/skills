@@ -222,12 +222,18 @@ O push na alpha dispara a build; teste unitário vermelho barra o deploy dela. S
 deploy não rodar, diga isso em vez de supor falha da skill. Nunca mergeie PR na alpha:
 a skill só empurra o bump.
 
-## Master e insider (só se pedirem)
+## Master e insider
 
-"Joga a versão na master e na insider": fast-forward de cada uma para o commit da tag
-da **última principal** (hotfix não vai), em cada projeto pedido, pulando branch que
-não existe. Se não for fast-forward, pare e leve a divergência à pessoa: nunca force
-por conta própria, e antes de qualquer force salve o que sairia numa branch de backup.
+No fim da principal e de cada `servico`, o script promove sozinho (`montar.sh promover
+<tag>` faz o mesmo à parte; `SEM_PROMOVER=1` pula):
+- **insider** vai para a tag nova;
+- **master** vai para a principal anterior, sem hotfix (a mais recente `vYY.T.NNN` antes
+  da nova que o projeto tem).
+
+Só fast-forward, e branch que não existe no origin é pulada. Se não for fast-forward
+(saída 6), a branch fica como está e o script lista os commits que sairiam: leve a
+divergência à pessoa. Nunca force por conta própria, e antes de qualquer force salve o que
+sairia numa branch de backup. Hotfix não promove.
 
 ## Erros comuns
 
