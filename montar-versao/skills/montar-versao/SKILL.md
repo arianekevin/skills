@@ -139,8 +139,9 @@ cai em `A CONFIRMAR`; `SEM_SERVICO="slug ..."` tira um candidato desta versão.
 
 **Descrição do ticket de versão.** No preparo, a Insider sai com o crm e os serviços na
 versão nova. A App sai com a imagem do crm que está no insider hoje: a principal anterior
-com o hotfix mais recente já criado. Hotfix que vier depois, quem acionou atualiza à mão.
-Vue fica "a definir". Linha preenchida à mão nunca é sobrescrita.
+com o hotfix mais recente já criado. A linha App do crm é sempre do script: toda rodada
+(preparo, montagem ou só o YouTrack) a refaz com o hotfix mais novo, mesmo já preenchida.
+Vue fica "a definir". As outras linhas preenchidas à mão nunca são sobrescritas.
 
 ## Versão principal
 
@@ -152,8 +153,9 @@ Vue fica "a definir". Linha preenchida à mão nunca é sobrescrita.
    (o pom da ponta já está na versão), não há commit novo: a tag vai na ponta.
 3. Em seguida, o script refaz a varredura do preparo no YouTrack com `--montagem`:
    - põe na versão os tickets que ficaram aptos durante a semana;
-   - preenche a linha App do ticket de versão, se ainda estiver "a definir", com a versão
-     que está no insider (a mais recente da principal anterior, com hotfix).
+   - refaz a linha App do ticket de versão com a versão que está no insider (a mais
+     recente da principal anterior, com hotfix). Hotfix criado depois: rode só o YouTrack
+     (abaixo) e a App acompanha.
 
    Vue continua "a definir": não há onde ler essa tag. Se sair `A CONFIRMAR` (saída 5),
    a tag já subiu. Resolva como no preparo e rode só o YouTrack:

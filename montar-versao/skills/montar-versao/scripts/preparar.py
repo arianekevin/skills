@@ -12,7 +12,7 @@
 3. Cria (ou atualiza, se já existe) o ticket de versão no PID para o Hugo:
    "Versão - DD/MM", com DD/MM = próxima segunda.
    A linha "App" sai com a versão que está no insider hoje (a mais recente da principal
-   anterior, com hotfix), já no preparo.
+   anterior, com hotfix), já no preparo, e é refeita a cada rodada (preparo e montagem).
 
 4. --outros-material imprime em JSON os commits da versão sem ticket nela (LAT, DEL, sem
    ticket...). --outros <json> recebe o agrupamento em seções que o agente faz e cria ou
@@ -42,6 +42,9 @@ RESPONSAVEL = os.environ.get("PREPARAR_RESPONSAVEL", "Hugo_Freitas")
 RE_VERSAO = re.compile(r"^v\d{2}\.[1-4]\.\d{3}$")
 RE_BACKEND = re.compile(r"^v\d{2}\.[1-4]\.\d{3}(\.\d+)?$")  # o que a troca automática pode sobrescrever
 A_DEFINIR = "a definir"
+# Linhas que são sempre do script: a App acompanha o insider de agora (principal anterior com o
+# hotfix mais recente), então é refeita a cada rodada, mesmo já preenchida.
+DO_SCRIPT = {("App", "Imagem do crm")}
 WORKSPACE = os.environ.get("BITBUCKET_WORKSPACE", "gitcolmeia")
 CONF = os.path.expanduser(os.environ.get("PREPARAR_CONF", "~/.claude/montar-versao/projetos.conf"))
 CONF_INICIAL = """# Projetos com ambiente de teste (alpha ou homolog) e se sobem na versão de bugfix de segunda.
@@ -406,7 +409,7 @@ def mesclar(antiga, nova):
             secao = _secao(l)
             cabecalhos[secao] = l
         elif ":" in l and (secao, l.split(":")[0]) in chaves_novas:
-            if A_DEFINIR not in l:
+            if A_DEFINIR not in l and (secao, l.split(":")[0]) not in DO_SCRIPT:
                 feitas[(secao, l.split(":")[0])] = l
         elif l.strip() and not l.startswith("Imagem do serviço "):
             extras.setdefault(secao, []).append(l)
@@ -554,7 +557,7 @@ def main():
     existente = yt("issues", {"query": f"project: PID {CAMPO}: {a.versao}",
                               "fields": "idReadable,summary,description", "$top": 5}) if tem_valor else []
     # App = o que está no insider hoje: a principal anterior com o hotfix mais recente criado até
-    # agora. Hotfix que vier depois quem acionou atualiza à mão (linha preenchida não é trocada).
+    # agora. A linha é do script (DO_SCRIPT): cada rodada a refaz com o hotfix mais novo.
     anterior = ultima_principal(crm, antes_de=a.versao)
     app = mais_recente_da(crm, anterior) if anterior else None
     desc = descricao(a.versao, servicos, app)
