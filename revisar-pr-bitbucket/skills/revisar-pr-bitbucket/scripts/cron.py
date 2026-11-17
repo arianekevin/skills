@@ -334,7 +334,7 @@ def to_review():
     if r.returncode != 0:
         warn(f"listagem falhou: {(r.stderr or r.stdout).strip()[:300]}")
         sys.exit(1)
-    prs, agent = {}, {}
+    prs, agent, tickets = {}, {}, {}
     for line in r.stdout.splitlines():
         parts = line.split(" | ", 4)
         if len(parts) == 5 and parts[3].startswith("REVISAR"):
@@ -343,7 +343,13 @@ def to_review():
                                cwd=CLONE, capture_output=True, text=True)
             # PR do agente de bugfix vai para o fim da fila: o de dev passa na frente
             (agent if branch.startswith(AGENT_BRANCH) else prs)[parts[0]] = h.stdout.strip() if h.returncode == 0 else "?"
-    return {**prs, **agent}
+            tickets[parts[0]] = TICKET.findall(line)
+    queue = {**prs, **agent}
+    # ordem da rodada: PrazoSLA do ticket, do mais próximo para o mais distante, para não estourar SLA (Ari, 17/11);
+    # sem prazo (ou sem ticket) vai depois, na ordem acima (dev antes do agente, quem espera há mais tempo primeiro)
+    due = {pr: min((d for d in map(sla_due, tickets.get(pr) or []) if d), default=None) for pr in queue}
+    order = sorted(queue, key=lambda pr: (due[pr] is None, due[pr] or 0))
+    return {pr: queue[pr] for pr in order}
 
 
 def plugin_version():
@@ -415,6 +421,28 @@ CALIBRATE = ("Calibração da régua, sem ninguém acompanhando: não pergunte n
 
 TICKET = __import__("re").compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
 SWEEP_HOURS = int(os.environ.get("REVISOR_VARRER_HORAS", "24"))
+
+
+_SLA = {}
+
+
+def sla_due(ticket):
+    """PrazoSLA do ticket no YouTrack (ms desde a época), ou None (sem prazo, sem acesso, erro). Cache da rodada."""
+    if ticket in _SLA:
+        return _SLA[ticket]
+    import urllib.request, urllib.parse
+    url = (os.environ.get("YOUTRACK_URL", "").rstrip("/") + f"/api/issues/{ticket}?"
+           + urllib.parse.urlencode({"fields": "customFields(name,value)"}))
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {os.environ.get('YOUTRACK_API_TOKEN', '')}",
+                                               "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            d = json.load(r)
+        v = next((c.get("value") for c in d.get("customFields", []) if c.get("name") == "PrazoSLA"), None)
+        _SLA[ticket] = v if isinstance(v, int) else None
+    except Exception:
+        _SLA[ticket] = None
+    return _SLA[ticket]
 
 
 def resolved(ticket):
