@@ -47,6 +47,9 @@ O que faz:
   3d. Achado vai direto ao dev, sem o corretor, quando o corretor não tem o que fazer: todas as categorias da
      revisão são nao_corrige_o_ticket ou decisao_de_produto, ou a última volta dele no PR terminou sem mudança, não
      houve commit depois e a revisão não viu decisão nova nos comentários. Conflito com o destino segue com o corretor.
+  3e. Limite de uso da conta ("You've hit your limit · resets ..."): a sessão volta na hora sem ter revisado nada.
+     A rodada para quieta: nada no Bitbucket nem no YouTrack, nenhum veredito, nenhuma tentativa contada. Com
+     $LIMITE_PAUSA, grava ali até quando (reset + 5 min); enquanto valer, as rodadas e o corretor saem sem fazer nada.
   4. Na tentativa $REVISOR_TENTATIVAS o PR sai das rodadas e um aviso é emitido. Qualquer novidade
      no PR depois da última tentativa zera a contagem: commit, comentário, mudança de estado
      (saiu do draft, marca removida, título ou descrição editados).
@@ -63,6 +66,11 @@ Ambiente (além das credenciais que a skill pede):
                       para o registro do veredito junto da versão do plugin, para medir a régua
   REVISOR_REVISOR     nome da conta do agente no Bitbucket, como aparece em "Reviewers"
                       (obrigatório com --urgente)
+  LIMITE_PAUSA        arquivo JSON ({"ate", "motivo", "quando"}) que marca a pausa por limite de uso da conta. Sem ele,
+                      o limite só para a rodada em curso e as próximas tentam de novo. O validador, que roda solto,
+                      pode ler o mesmo arquivo
+  LIMITE_CMD          comando que registra o limite no lugar do arquivo (`$LIMITE_CMD pausar <texto>`, no ambiente
+                      da sessão): para quem alterna entre contas e pausa só a que estourou
   REVISOR_AVISAR      comando que recebe o aviso como último argumento (ex.: um script que manda
                       para o chat). Sem ele, o aviso fica só em $REVISOR_DIR/avisos.log.
   CORRETOR_CLAUDE     se definido, a rodada é de triagem: PR aprovado é aprovado, e PR com achado
@@ -201,6 +209,8 @@ def validator(pr):
     cmd = os.environ.get("REVISOR_VALIDAR")
     if not cmd:
         return log(f"#{pr}: na fila do validador (REVISOR_VALIDAR ausente: fica para o cron dele)")
+    if passos.pausada():
+        return log(f"#{pr}: validador não chamado (limite de uso da conta); fica na fila")
     log(f"#{pr}: validador chamado")
     done = (f"echo \"$(date '+%Y-%m-%d %H:%M') #{pr}: validador terminou: $(grep '#{pr}:' \"$HOME/testador/cron.log\" | tail -1 | cut -c18-200)\""
             f" >> {shlex.quote(str(DIR / 'cron.log'))}")
@@ -570,6 +580,8 @@ def main():
     if "--calibrar" in sys.argv[1:]:
         i = sys.argv.index("--calibrar")
         return calibrate(sys.argv[i + 1] if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith("--") else DIR / "gabarito.jsonl")
+    if passos.pausada():  # limite de uso da conta ainda valendo: nem o fetch
+        return
     if URGENT and not to_review():  # a cada 2 min: sem pedido de urgência, sai antes do fetch
         return
     (DIR / "rodadas").mkdir(parents=True, exist_ok=True)
@@ -663,6 +675,9 @@ def main():
         warn(f"comando do Claude não encontrado: {CLAUDE[0]}")
         sys.exit(1)
 
+    cut = passos.limite(out)
+    if cut:  # nada foi revisado: sem veredito, sem tentativa, sem estado gravado; o PR volta normalmente depois do reset
+        return passos.pausar(cut, log)
     keep_verdicts(record, out)
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
     after = to_review()

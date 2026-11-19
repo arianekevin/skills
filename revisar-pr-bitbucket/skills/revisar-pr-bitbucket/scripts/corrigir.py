@@ -55,6 +55,9 @@ Ambiente (além do que cron.py já usa):
                       (ele arruma o teste, se o teste fixava o comportamento que o ticket muda, ou
                       conserta a mudança), e sem resolver nada é publicado. Teste que já falhava no
                       destino não conta.
+  LIMITE_PAUSA        arquivo da pausa por limite de uso da conta (ver cron.py). Com o limite estourado, a sessão
+                      volta na hora: o corretor para, sem publicar, sem contar volta e com o PR na fila; sai também
+                      sem fazer nada enquanto a pausa valer
   CORRETOR_GIT_NAME, CORRETOR_GIT_EMAIL   autor do commit (obrigatórios para publicar)
   CORRETOR_BITBUCKET_TOKEN  access token do repositório só do corretor (Repositories: write; Pull
                       requests: write). Com ele o corretor tem identidade própria no Bitbucket: o push
@@ -121,12 +124,21 @@ def author(pr, branch):
             "repetir caminho descartado; não é evidência — o que vale é o código.")
 
 
+class LimiteDeUso(Exception):
+    """A conta bateu o limite de uso: a sessão não fez nada, e a correção para sem publicar nem contar volta."""
+
+
 def session(cmd, prompt, cwd, env, out):
-    """Uma sessão do Claude sem supervisão; a saída vai para `out` e os passos para <out>.passos.jsonl. Devolve como terminou."""
+    """Uma sessão do Claude sem supervisão; a saída vai para `out` e os passos para <out>.passos.jsonl. Devolve como
+    terminou. Levanta LimiteDeUso se a conta está sem limite."""
     try:
-        return f"saiu com {passos.run(cmd, prompt, cwd, env, out, TIMEOUT)}"
+        end = f"saiu com {passos.run(cmd, prompt, cwd, env, out, TIMEOUT)}"
     except subprocess.TimeoutExpired:
         return f"cortada aos {TIMEOUT // 60} min"
+    cut = passos.limite(out)
+    if cut:
+        raise LimiteDeUso(cut)
+    return end
 
 
 def suite(tree, out):
@@ -518,7 +530,9 @@ def publish(pr, branch, head, tree, work, verdict, dry, fresh, quiet=False, unre
                                                   "desde": datetime.datetime.now(datetime.timezone.utc).isoformat()}))
         log(f"#{pr}: aprovado — " + ", ".join(done + ["para o validador, sem aprovação no Bitbucket"]))
         cmd = os.environ.get("REVISOR_VALIDAR")
-        if cmd:  # o validador prova agora, solto: o corretor segue para o próximo da fila, como a rodada do revisor
+        if cmd and passos.pausada():
+            log(f"#{pr}: validador não chamado (limite de uso da conta); fica na fila")
+        elif cmd:  # o validador prova agora, solto: o corretor segue para o próximo da fila, como a rodada do revisor
             subprocess.Popen(["flock", "/tmp/testador-prova.lock", "bash", "-c", f"{cmd} --pr {shlex.quote(pr)} --chamado >> \"$HOME/testador/cron.log\" 2>&1"],
                              cwd=CLONE, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
                              env={k: v for k, v in os.environ.items() if k != "CORRETOR_BITBUCKET_TOKEN"})
@@ -550,6 +564,8 @@ def main():
         sys.exit("REVISOR_CLONE ausente: aponte para o clone do repo dos PRs")
     if not CORRETOR:
         sys.exit("CORRETOR_CLAUDE ausente: o comando do Claude Code do corretor, com as permissões dele")
+    if passos.pausada():  # limite de uso da conta ainda valendo
+        return
     os.chdir(CLONE)
     base = f"{bitbucket.resolve_repo(None)}/pullrequests"
     (DIR / "rodadas").mkdir(parents=True, exist_ok=True)
@@ -575,7 +591,11 @@ def main():
     while todo and len(seen) < MAX:  # a fila pode crescer enquanto um PR é corrigido
         pr = todo[0]
         seen.add(pr)
-        correct(base, pr, a.ensaio, a.so_resolvido)
+        try:
+            correct(base, pr, a.ensaio, a.so_resolvido)
+        except LimiteDeUso as e:  # o PR fica na fila como estava; a cópia da branch sai
+            git("worktree", "remove", "--force", str(TREES / f"pr-{pr}"))
+            return passos.pausar(str(e), log)
         todo = [] if a.pr or a.reabrir else [p for p in queue() if p not in seen]
 
 

@@ -4,7 +4,7 @@ Cada linha é um passo curto: o que o agente disse, a ferramenta que usou (com o
 subagente leva "agente" com a descrição dele, para dar para ver as revisões em paralelo. O texto final da sessão
 vai para o arquivo de saída, como antes.
 """
-import datetime, json, pathlib, subprocess, threading
+import datetime, json, os, pathlib, re, shlex, subprocess, threading
 
 SUBAGENT = ("Task", "Agent")
 
@@ -60,3 +60,73 @@ def run(cmd, prompt, cwd, env, out, timeout):
     if proc.returncode < 0:
         raise subprocess.TimeoutExpired(proc.args, timeout)
     return proc.returncode
+
+
+# Limite de uso da conta: com ele estourado, todo `claude -p` volta na hora com um texto como "You've hit your weekly
+# limit · resets Nov 22, 4pm". A sessão não revisou nada; o que ela devolveu não é veredito, falha nem tentativa.
+LIMITE = re.compile(r"hit your (?:\w+ )?limit|usage limit reached", re.I)
+RESET = re.compile(r"resets\s+(?:([A-Z][a-z]{2})[a-z]*\s+(\d{1,2}),?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)", re.I)
+MESES = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+
+
+def reset_em(texto, agora=None):
+    """Quando o limite volta, pelo texto ("resets Nov 22, 4pm", "resets 4:30pm"), na hora local, mais 5 minutos de folga.
+    Sem data legível, ou no passado: daqui a 1 hora."""
+    agora = agora or datetime.datetime.now()
+    fallback = agora + datetime.timedelta(hours=1)
+    m = RESET.search(texto)
+    if not m:
+        return fallback
+    mes, dia, h, mi, ap = m.groups()
+    h = int(h) % 12 + (12 if ap.lower() == "pm" else 0)
+    try:
+        if mes and mes[:3].lower() in MESES:
+            t = datetime.datetime(agora.year, MESES[mes[:3].lower()], int(dia), h, int(mi or 0))
+            if t < agora - datetime.timedelta(days=1):
+                t = t.replace(year=agora.year + 1)
+        else:
+            t = agora.replace(hour=h, minute=int(mi or 0), second=0, microsecond=0)
+            if t <= agora:
+                t += datetime.timedelta(days=1)
+    except ValueError:
+        return fallback
+    t += datetime.timedelta(minutes=5)
+    return t if t > agora else fallback
+
+
+def limite(out):
+    """O texto final da sessão em `out` é o aviso de limite de uso? Devolve o texto, ou None. Só vale texto curto:
+    uma revisão de verdade que cite a frase num relatório longo não é o limite."""
+    try:
+        texto = pathlib.Path(out).read_text().strip()
+    except OSError:
+        return None
+    return texto if len(texto) < 600 and LIMITE.search(texto) else None
+
+
+def pausar(texto, log):
+    """Registra uma linha e, com $LIMITE_PAUSA, grava o arquivo que faz as próximas rodadas saírem quietas até o reset.
+    Com $LIMITE_CMD (ex.: um gestor de várias contas), quem registra é ele: `$LIMITE_CMD pausar <texto>`, no mesmo
+    ambiente da sessão, para saber qual conta estourou."""
+    ate = reset_em(texto)
+    log(f"limite de uso da conta: rodada parada até {ate:%Y-%m-%d %H:%M}")
+    cmd = os.environ.get("LIMITE_CMD")
+    if cmd:
+        subprocess.run([*shlex.split(cmd), "pausar", texto[:500]], timeout=30, check=False)
+        return
+    alvo = os.environ.get("LIMITE_PAUSA")
+    if alvo:
+        arq = pathlib.Path(alvo).expanduser()
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        arq.write_text(json.dumps({"ate": ate.strftime("%Y-%m-%dT%H:%M"), "motivo": texto[:200],
+                                   "quando": f"{datetime.datetime.now():%Y-%m-%d %H:%M}"}, ensure_ascii=False))
+
+
+def pausada():
+    """Há pausa por limite de uso ainda valendo em $LIMITE_PAUSA? Arquivo ausente ou ilegível: não."""
+    alvo = os.environ.get("LIMITE_PAUSA")
+    try:
+        ate = datetime.datetime.fromisoformat(json.loads(pathlib.Path(alvo).expanduser().read_text())["ate"])
+    except (TypeError, OSError, ValueError, KeyError):
+        return False
+    return ate > datetime.datetime.now()
