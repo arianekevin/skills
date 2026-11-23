@@ -400,6 +400,14 @@ def open_doors(v):
     return out[:5]
 
 
+def commit_hash(ref):
+    """O registro às vezes traz a branch no lugar do commit; a branch some depois do merge e a calibração perde o PR."""
+    if not ref:
+        return ref
+    c = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{ref}^{{commit}}"], cwd=CLONE, capture_output=True, text=True)
+    return c.stdout.strip()[:10] if c.returncode == 0 else ref
+
+
 def keep_verdicts(record, out):
     """Junta o registro da rodada em vereditos.jsonl (histórico para estatística), com a hora e a rodada.
     Linha inválida ou categoria fora da lista é guardada como 'outro', para não perder o PR."""
@@ -413,7 +421,7 @@ def keep_verdicts(record, out):
             except (ValueError, KeyError, TypeError):
                 continue
             cats = [c if c in CATEGORIES else "outro" for c in v.get("categorias") or []]
-            fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": v.get("commit"),
+            fh.write(json.dumps({"quando": now(), "rodada": out.name, "pr": pr, "commit": commit_hash(v.get("commit")),
                                  "tickets": [str(t) for t in v.get("tickets") or [] if isinstance(t, str)][:10], "veredito": v.get("veredito"), "categorias": cats, "notas": scores(v),
                                  "depende_de": depends(v), "portas_abertas": open_doors(v),
                                  "plugin": plugin_version(), "modelo": MODEL or "padrão"}, ensure_ascii=False) + "\n")
@@ -510,7 +518,11 @@ def calibrate(answers):
     for line in pathlib.Path(answers).expanduser().read_text().splitlines():
         if line.strip():
             v = json.loads(line)
-            key[str(v["pr"]).lstrip("#")] = v
+            key[str(v.get("pr", "")).lstrip("#")] = v
+    bad = [f"#{pr} sem {', '.join(k for k in ('commit', 'veredito') if not v.get(k))}"
+           for pr, v in key.items() if not (pr and v.get("commit") and v.get("veredito"))]
+    if bad:  # sem veredito, o esperado sai vazio e bate com o registro vazio: acerto falso
+        sys.exit("calibração: gabarito incompleto (cada linha leva pr, commit, veredito e categorias): " + "; ".join(bad))
     subprocess.run(["git", "fetch", "origin", "--prune", "-q"], cwd=CLONE, capture_output=True)
     lines, missing = [], []
     for pr, v in key.items():
@@ -540,13 +552,14 @@ def calibrate(answers):
                        env={**{k: v for k, v in os.environ.items() if k not in ("CORRETOR_BITBUCKET_TOKEN", "YOUTRACK_WRITE_TOKEN")},
                             "BITBUCKET_SO_LEITURA": "1"})
     got = {}
-    if record.exists():
-        for line in record.read_text().splitlines():
-            try:
-                v = json.loads(line)
-                got[str(v["pr"]).lstrip("#")] = v
-            except (ValueError, KeyError, TypeError):
-                continue
+    if not record.exists():
+        sys.exit(f"calibração: o revisor não gravou {record}; veja o motivo em {out_dir / (stamp + '.log')}")
+    for line in record.read_text().splitlines():
+        try:
+            v = json.loads(line)
+            got[str(v["pr"]).lstrip("#")] = v
+        except (ValueError, KeyError, TypeError):
+            continue
     result = out_dir / f"{stamp}-{plugin_version()}-{(MODEL or 'padrao').replace('/', '_')}.jsonl"
     hits = cats = 0
     with open(result, "w") as fh:
