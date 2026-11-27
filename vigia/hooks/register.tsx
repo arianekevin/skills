@@ -1,11 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Alvo, Item, Passo } from '../types'
+import type { Alvo, Falha, Item, Passo } from '../types'
 
-// Vigia: acompanha outra sessão do Claude Code pelo histórico (.jsonl) dela.
-// O script lê e marca os alertas por padrão (sem IA); o Haiku resume cada bloco
-// (o que fez, por quê, e CUIDADO quando é decisão séria).
 
 const PANE = 'vigia'
 const script = ($: EngineInterface) => `${$.plugin.root}/bin/vigia.py`
@@ -13,32 +10,40 @@ const TICK_MS = 4000
 const OCIOSO_MS = 20000 // sem passo novo por 20 s fecha o bloco
 const COMANDOS_POR_BLOCO = 5
 const MAX_ITENS = 200
+const VISIVEIS = 60
 
 const alvo = atom({ plugin: 'vigia', key: 'alvo' } as const, null, { shape: 'alvo-1' })
 const offset = atom({ plugin: 'vigia', key: 'offset' } as const, -1, { shape: 'offset-1' })
 const itens = atom({ plugin: 'vigia', key: 'itens' } as const, [], { shape: 'itens-1' })
-const pendentes = atom({ plugin: 'vigia', key: 'pendentes' } as const, [], { shape: 'pendentes-1' })
+const pendentes = atom({ plugin: 'vigia', key: 'pendentes' } as const, [], { shape: 'pendentes-2' })
 const pedido = atom({ plugin: 'vigia', key: 'pedido' } as const, '', { shape: 'pedido-1' })
 const agora = atom({ plugin: 'vigia', key: 'agora' } as const, '', { shape: 'agora-1' })
 const ultimaNovidade = atom({ plugin: 'vigia', key: 'ultimaNovidade' } as const, 0, { shape: 'un-1' })
+const plano = atom({ plugin: 'vigia', key: 'plano' } as const, '', { shape: 'plano-1' })
+const falhaAberta = atom({ plugin: 'vigia', key: 'falhaAberta' } as const, null, { shape: 'falha-1' })
 
-const REGRAS = `Você vigia outra sessão de um agente de programação (Claude Code) e explica para quem é responsável pelo projeto, em português do Brasil, o que o agente fez num bloco de passos.
+const REGRAS = `Você vigia outra sessão de um agente de programação (Claude Code) e explica para a pessoa responsável, em português do Brasil, o que o agente fez num bloco de passos. Ela só quer ser chamada para o que não deveria ignorar.
+
+Você recebe: o PLANO (documento de plano e os pedidos dela na sessão), o bloco de PASSOS, os SINAIS do bloco (ações detectadas por padrão) e, se houver, uma FALHA EM ABERTO (teste ou build vermelho ainda sem verde depois).
 
 Responda SÓ com um JSON, sem texto em volta:
-{"fez": "...", "porque": "...", "cuidado": null, "trecho": null}
+{"fez": "...", "porque": "...", "alerta": null}
+ou, quando houver alerta:
+{"fez": "...", "porque": "...", "alerta": {"nivel": "cuidado" | "atencao", "texto": "...", "trecho": "..."}}
 
-- "fez": uma frase curta, linguagem comum, nome da coisa (tela, regra, recurso), não do arquivo. Sem jargão desnecessário.
-- "porque": o motivo, tirado do PEDIDO dessa pessoa, do RACIOCÍNIO ou da FALA do agente. Cite ou parafraseie de perto. Se nenhum motivo estiver escrito, responda exatamente "motivo não declarado". Nunca invente motivo.
-- "cuidado": preencha SÓ quando houver decisão séria que merece que ela pare e olhar:
-  * o agente escolheu sozinho um caminho de arquitetura ou de regra de negócio que o pedido não pediu;
-  * foi além do escopo do pedido ou mudou comportamento que já existia;
-  * mandou dado de cliente para um serviço de IA externo, ou contrariou uma regra que ela deu.
-  Uma frase dizendo qual é a decisão. Caso contrário, null. Na dúvida entre séria e normal, prefira marcar.
-- "trecho": quando "cuidado" vier preenchido, o trecho exato (até 200 caracteres) dos passos que motivou. Senão null.
+- "fez": uma frase curta (até 30 palavras), linguagem comum, nome da coisa (tela, regra, recurso), não do arquivo.
+- "porque": até 30 palavras. O motivo, tirado do PLANO, do PEDIDO, do RACIOCÍNIO ou da FALA. Se o passo é uma etapa do plano, diga qual. Só responda "motivo não declarado" se nem o plano explicar. Nunca invente.
+- "alerta": quase sempre null. Só preencha nestes casos:
+  * nivel "cuidado": uma MENSAGEM PARA OUTRA SESSÃO que muda o rumo do trabalho de lá (dá ordem nova, cancela, troca o escopo, manda apagar ou publicar). Resposta, status ou pergunta não é cuidado.
+  * nivel "atencao":
+    - com FALHA EM ABERTO, o agente diz que terminou, que está fechado ou passando, ou parte para a próxima etapa sem ter resolvido nem explicado a falha;
+    - o agente desliga, pula, apaga ou afrouxa um teste ou verificação para ficar verde;
+    - um SINAL (push, merge, tag, chamada que altera serviço externo, migration que apaga ou renomeia) que o plano e os pedidos não cobrem. Se o plano cobre (ex.: a sprint prevê migration, o fluxo é abrir PR e dar push na branch da tarefa), NÃO é alerta;
+    - o agente faz o contrário de uma regra ou proibição que a pessoa escreveu.
+  "texto": uma frase dizendo o que ela precisa olhar. "trecho": o trecho exato (até 200 caracteres) dos passos que motivou.
+- NÃO é alerta: teste vermelho enquanto o agente ainda está corrigindo, commit, build, rebase, escolhas de implementação dentro do plano, ler ou procurar código. Na dúvida, null.`
 
-Commit, push, build e teste NÃO são assunto seu: outro sistema já alerta sobre isso.`
-
-type Resumo = { fez: string; porque: string; cuidado: string | null; trecho: string | null }
+type Resumo = { fez: string; porque: string; alerta: { nivel: 'cuidado' | 'atencao'; texto: string; trecho?: string | null } | null }
 
 function hhmm(): string {
   const d = new Date()
@@ -68,6 +73,25 @@ let cancelar: (() => void) | null = null
 async function juntar($: EngineInterface, novos: Item[]) {
   if (novos.length === 0) return
   await update($, itens, (l: Item[]) => [...l, ...novos].slice(-MAX_ITENS))
+  try {
+    await $.ui.scroll({ in: PANE, to: 'end' })
+  } catch {
+    return
+  }
+}
+
+async function carregarPlano($: EngineInterface, caminho: string) {
+  const res = await $.process.run(['python3', '-I', script($), 'plano', caminho], { timeoutMs: 20000 })
+  if (res.exitCode !== 0) return
+  const r = lerJson<{ plano: string }>(res.stdout)
+  if (r) await update($, plano, () => r.plano)
+}
+
+async function mostrarSinalForte($: EngineInterface, p: Passo, avisar: boolean) {
+  if (!p.sinal) return
+  const item: Item = { tipo: 'cuidado', hora: p.hora, texto: `${p.sinal.motivo}: ${p.texto}`, trecho: p.sinal.trecho }
+  await juntar($, [item])
+  if (avisar) await notificar($, 'Vigia · CUIDADO', item.texto)
 }
 
 async function notificar($: EngineInterface, titulo: string, texto: string) {
@@ -87,24 +111,33 @@ async function notificar($: EngineInterface, titulo: string, texto: string) {
 async function resumir($: EngineInterface, bloco: Passo[]) {
   if (bloco.length === 0) return
   const ped = await read($, pedido)
+  const pl = await read($, plano)
+  const falha: Falha | null = await read($, falhaAberta)
+  const rotulos = { pedido: 'PEDIDO', fala: 'FALA', raciocinio: 'RACIOCÍNIO', comando: 'COMANDO', falha: 'FALHA', verde: 'VERDE' }
   const linhas = bloco
-    .map(p => {
-      const rot = { pedido: 'PEDIDO', fala: 'FALA', raciocinio: 'RACIOCÍNIO', comando: 'COMANDO', falha: 'FALHA' }[p.tipo]
-      return `[${p.hora}] ${rot}: ${p.texto}${p.cmd ? `\n   $ ${p.cmd}` : ''}`
-    })
+    .map(p => `[${p.hora}] ${rotulos[p.tipo]}: ${p.texto}${p.cmd ? `\n   $ ${p.cmd}` : ''}`)
     .join('\n')
-  const prompt = `PEDIDO mais recente da pessoa: ${ped || '(não visto)'}\n\nPASSOS DO BLOCO:\n${linhas}`
+  const sinais = bloco
+    .filter(p => p.sinal && !p.sinal.forte)
+    .map(p => `- [${p.hora}] ${p.sinal!.motivo}: ${p.sinal!.trecho ?? p.cmd ?? p.texto}`)
+    .join('\n')
+  const prompt = [
+    `PLANO:\n${pl || '(nenhum plano encontrado)'}`,
+    `PEDIDO mais recente: ${ped || '(não visto)'}`,
+    `SINAIS:\n${sinais || '(nenhum)'}`,
+    `FALHA EM ABERTO: ${falha ? `[${falha.hora}] ${falha.texto.slice(0, 300)}` : '(nenhuma)'}`,
+    `PASSOS DO BLOCO:\n${linhas}`,
+  ].join('\n\n')
   const hora = bloco[bloco.length - 1]?.hora || hhmm()
   const r = await $.model.complete({
     model: 'haiku',
     system: REGRAS,
     prompt,
-    maxTokens: 400,
+    maxTokens: 800,
     effort: 'low',
     timeoutMs: 30000,
   })
   if (!r.isAnswered) {
-    // sem resumo, mostra o que o próprio agente escreveu
     const fala = [...bloco].reverse().find(p => p.tipo === 'fala' || p.tipo === 'raciocinio')
     await juntar($, [{ tipo: 'resumo', hora, texto: fala?.texto.slice(0, 200) ?? `${bloco.length} passos`, porque: `(Haiku indisponível: ${r.reason})` }])
     return
@@ -115,9 +148,10 @@ async function resumir($: EngineInterface, bloco: Passo[]) {
     return
   }
   const novos: Item[] = [{ tipo: 'resumo', hora, texto: j.fez, porque: j.porque }]
-  if (j.cuidado) {
-    novos.push({ tipo: 'cuidado', hora, texto: j.cuidado, trecho: j.trecho ?? undefined, porque: 'decisão (Haiku)' })
-    await notificar($, 'Vigia · CUIDADO', j.cuidado)
+  const a = j.alerta
+  if (a && a.texto && (a.nivel === 'cuidado' || a.nivel === 'atencao')) {
+    novos.push({ tipo: a.nivel, hora, texto: a.texto, trecho: a.trecho ?? undefined })
+    if (a.nivel === 'cuidado') await notificar($, 'Vigia · CUIDADO', a.texto)
   }
   await juntar($, novos)
 }
@@ -159,25 +193,19 @@ async function tick($: EngineInterface) {
         await fecharBloco($)
         await update($, pedido, () => p.texto)
         await juntar($, [{ tipo: 'pedido', hora: p.hora, texto: p.texto }])
+        await carregarPlano($, a.caminho)
         continue
       }
-      if (p.alerta) {
-        const item: Item = {
-          tipo: p.alerta.nivel === 'cuidado' ? 'cuidado' : 'atencao',
-          hora: p.hora,
-          texto: `${p.alerta.motivo}: ${p.texto}`,
-          trecho: p.alerta.trecho ?? (p.tipo === 'falha' ? p.texto.slice(0, 200) : undefined),
-        }
-        if (p.tipo === 'falha') item.texto = 'falha ou teste vermelho'
-        await juntar($, [item])
-        if (p.alerta.nivel === 'cuidado' && off >= 0) await notificar($, 'Vigia · CUIDADO', item.texto)
-      }
+      if (p.tipo === 'falha') await update($, falhaAberta, () => ({ hora: p.hora, texto: p.texto }))
+      if (p.tipo === 'verde') await update($, falhaAberta, () => null)
+      if (p.sinal?.forte) await mostrarSinalForte($, p, off >= 0)
       if (p.tipo === 'comando') await update($, agora, () => `${p.hora} ${p.texto}`)
       await update($, pendentes, (l: Passo[]) => [...l, p])
       const pend: Passo[] = await read($, pendentes)
       const comandos = pend.filter(x => x.tipo === 'comando').length
       const falaLonga = p.tipo === 'fala' && p.texto.length > 300
-      if (comandos >= COMANDOS_POR_BLOCO || falaLonga) await fecharBloco($)
+      const julgar = Boolean(p.sinal && !p.sinal.forte)
+      if (comandos >= COMANDOS_POR_BLOCO || falaLonga || julgar) await fecharBloco($)
     }
     if (off < 0) await fecharBloco($) // primeira leitura: um resumo de "onde ela está"
   } finally {
@@ -224,6 +252,9 @@ async function rodarComando($: EngineInterface, arg: string): Promise<{ text: st
   await update($, pendentes, () => [])
   await update($, pedido, () => '')
   await update($, agora, () => '')
+  await update($, falhaAberta, () => null)
+  await update($, plano, () => '')
+  await carregarPlano($, caminho)
   await juntar($, [{ tipo: 'aviso', hora: hhmm(), texto: `vigiando a sessão ${id}` }])
   await $.ui.open({ id: PANE, title: `Vigia · ${id}` })
   void tick($)
@@ -260,13 +291,14 @@ export const register: Register = on => {
     const ped: string = await read($, pedido)
     const ag: string = await read($, agora)
     const pend: Passo[] = await read($, pendentes)
-    const linhas = Math.max(4, (e.viewport?.rows ?? 30) - 7)
-    const visiveis = lista.slice(-Math.max(3, Math.floor(linhas / 2)))
+    const falha: Falha | null = await read($, falhaAberta)
+    const visiveis = lista.slice(-VISIVEIS)
 
     return (
       <Box flexDirection="column">
         <Text bold>{a ? `Vigiando ${a.id}` : 'Vigia parado — /vigia para escolher a sessão'}</Text>
         {ped ? <Text dimColor>Pedido: {ped.slice(0, 160)}</Text> : null}
+        {falha ? <Text dimColor>teste vermelho em aberto (o agente está corrigindo)</Text> : null}
         <Text dimColor> </Text>
         {visiveis.length === 0 && <Text dimColor>Nada ainda.</Text>}
         {visiveis.map(it => {
