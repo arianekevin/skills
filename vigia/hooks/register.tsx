@@ -62,6 +62,8 @@ function lerJson<T>(texto: string): T | null {
 let ocupado = false
 let deNovo = false
 let cancelar: (() => void) | null = null
+let seguindoOFim = true
+let ultimoDesenhado = ''
 
 async function sessao($: EngineInterface, id: string): Promise<Sessao | undefined> {
   const lista: Sessao[] = await read($, sessoes)
@@ -289,6 +291,7 @@ async function rodarComando($: EngineInterface, arg: string): Promise<{ text: st
   await carregarPlano($, id, caminho)
   const todas: Sessao[] = await read($, sessoes)
   await $.ui.open({ id: PANE, title: `Vigia · ${todas.map(s => s.nome).join(' + ')}` })
+  seguindoOFim = true
   irParaOFim($)
   void tick($)
   const aviso = saiu ? ` (parei de vigiar ${saiu.nome}: o limite é ${MAX_SESSOES})` : ''
@@ -333,6 +336,11 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    if (e.origin.kind === 'person') seguindoOFim = e.offset >= e.contentRows - e.bodyRows
+    return next(e)
+  })
+
   on('command.run', { command: 'vigia' }, async ($, e) => {
     try {
       return await rodarComando($, (e.args || '').trim())
@@ -346,6 +354,12 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const lista: Sessao[] = await read($, sessoes)
     if (lista.length === 0) return <Text bold>Vigia parado — /vigia para escolher a sessão</Text>
+
+    const ultimo = lista.map(s => `${s.id}:${s.itens.length}:${s.itens[s.itens.length - 1]?.hora}:${s.itens[s.itens.length - 1]?.texto}:${s.pendentes.length}`).join('|')
+    if (ultimo !== ultimoDesenhado) {
+      ultimoDesenhado = ultimo
+      if (seguindoOFim) $.clock.after(150, () => irParaOFim($))
+    }
 
     const colunasTotal = e.props.bodyColumns || e.viewport?.columns || 80
     const linhasTotal = Math.max(10, (e.props.scroll?.bodyRows || e.viewport?.rows || 30) - 1)
