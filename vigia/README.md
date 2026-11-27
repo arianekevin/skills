@@ -18,7 +18,7 @@ está fazendo e por quê — sem você ler o terminal dela.
 - Não alerta: teste vermelho enquanto o agente corrige, commit, rebase, migration nova prevista no plano.
 - O Haiku resume cada bloco de passos: o que fez e por quê (do plano, do pedido, do raciocínio ou da fala; sem nada
   escrito, "motivo não declarado").
-- CUIDADO vira toast e, no macOS, notificação do sistema. O painel rola sozinho para o mais recente.
+- CUIDADO vira toast e, no macOS, notificação do sistema, com o nome da sessão.
 
 ## Instalação
 
@@ -32,11 +32,14 @@ Requer `python3` no PATH. Reinicie a sessão depois de instalar.
 ## Uso
 
 ```
-/vigia            # lista as sessões com atividade nas últimas 6 h
-/vigia <id>       # liga o painel nessa sessão (prefixo do id basta)
-/vigia parar
-/vigia limpar     # esvazia o painel
+/vigia                    # lista as sessões com atividade nas últimas 6 h
+/vigia <id> [nome]        # passa a vigiar essa sessão (prefixo do id basta); nome opcional, ex.: ndesk
+/vigia parar [nome|id]    # para uma sessão, ou todas sem argumento
+/vigia limpar             # esvazia o painel
 ```
+
+Até 3 sessões ao mesmo tempo, num painel só: lado a lado quando o painel tem largura (45 colunas por sessão),
+uma embaixo da outra quando não tem. Cada uma mostra os itens mais recentes que cabem na altura.
 
 ## Ajustar os alertas
 

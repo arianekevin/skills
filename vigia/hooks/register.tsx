@@ -1,26 +1,18 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Alvo, Falha, Item, Passo } from '../types'
-
+import type { Item, Passo, Sessao } from '../types'
 
 const PANE = 'vigia'
 const script = ($: EngineInterface) => `${$.plugin.root}/bin/vigia.py`
 const TICK_MS = 4000
-const OCIOSO_MS = 20000 // sem passo novo por 20 s fecha o bloco
+const OCIOSO_MS = 20000
 const COMANDOS_POR_BLOCO = 5
 const MAX_ITENS = 200
-const VISIVEIS = 60
+const MAX_SESSOES = 3
+const LARGURA_MINIMA_COLUNA = 45
 
-const alvo = atom({ plugin: 'vigia', key: 'alvo' } as const, null, { shape: 'alvo-1' })
-const offset = atom({ plugin: 'vigia', key: 'offset' } as const, -1, { shape: 'offset-1' })
-const itens = atom({ plugin: 'vigia', key: 'itens' } as const, [], { shape: 'itens-1' })
-const pendentes = atom({ plugin: 'vigia', key: 'pendentes' } as const, [], { shape: 'pendentes-2' })
-const pedido = atom({ plugin: 'vigia', key: 'pedido' } as const, '', { shape: 'pedido-1' })
-const agora = atom({ plugin: 'vigia', key: 'agora' } as const, '', { shape: 'agora-1' })
-const ultimaNovidade = atom({ plugin: 'vigia', key: 'ultimaNovidade' } as const, 0, { shape: 'un-1' })
-const plano = atom({ plugin: 'vigia', key: 'plano' } as const, '', { shape: 'plano-1' })
-const falhaAberta = atom({ plugin: 'vigia', key: 'falhaAberta' } as const, null, { shape: 'falha-1' })
+const sessoes = atom({ plugin: 'vigia', key: 'sessoes' } as const, [], { shape: 'sessoes-1' })
 
 const REGRAS = `Você vigia outra sessão de um agente de programação (Claude Code) e explica para a pessoa responsável, em português do Brasil, o que o agente fez num bloco de passos. Ela só quer ser chamada para o que não deveria ignorar.
 
@@ -68,30 +60,28 @@ function lerJson<T>(texto: string): T | null {
 }
 
 let ocupado = false
+let deNovo = false
 let cancelar: (() => void) | null = null
 
-async function juntar($: EngineInterface, novos: Item[]) {
-  if (novos.length === 0) return
-  await update($, itens, (l: Item[]) => [...l, ...novos].slice(-MAX_ITENS))
-  try {
-    await $.ui.scroll({ in: PANE, to: 'end' })
-  } catch {
-    return
-  }
+async function sessao($: EngineInterface, id: string): Promise<Sessao | undefined> {
+  const lista: Sessao[] = await read($, sessoes)
+  return lista.find(s => s.id === id)
 }
 
-async function carregarPlano($: EngineInterface, caminho: string) {
+async function mudar($: EngineInterface, id: string, fn: (s: Sessao) => Sessao) {
+  await update($, sessoes, (l: Sessao[]) => l.map(s => (s.id === id ? fn(s) : s)))
+}
+
+async function juntar($: EngineInterface, id: string, novos: Item[]) {
+  if (novos.length === 0) return
+  await mudar($, id, s => ({ ...s, itens: [...s.itens, ...novos].slice(-MAX_ITENS) }))
+}
+
+async function carregarPlano($: EngineInterface, id: string, caminho: string) {
   const res = await $.process.run(['python3', '-I', script($), 'plano', caminho], { timeoutMs: 20000 })
   if (res.exitCode !== 0) return
   const r = lerJson<{ plano: string }>(res.stdout)
-  if (r) await update($, plano, () => r.plano)
-}
-
-async function mostrarSinalForte($: EngineInterface, p: Passo, avisar: boolean) {
-  if (!p.sinal) return
-  const item: Item = { tipo: 'cuidado', hora: p.hora, texto: `${p.sinal.motivo}: ${p.texto}`, trecho: p.sinal.trecho }
-  await juntar($, [item])
-  if (avisar) await notificar($, 'Vigia · CUIDADO', item.texto)
+  if (r) await mudar($, id, s => ({ ...s, plano: r.plano }))
 }
 
 async function notificar($: EngineInterface, titulo: string, texto: string) {
@@ -104,15 +94,20 @@ async function notificar($: EngineInterface, titulo: string, texto: string) {
       `display notification "${limpo(texto)}" with title "${limpo(titulo)}" sound name "Basso"`,
     ])
   } catch {
-    // sem notificação do Mac, fica o toast e o painel
+    return
   }
 }
 
-async function resumir($: EngineInterface, bloco: Passo[]) {
-  if (bloco.length === 0) return
-  const ped = await read($, pedido)
-  const pl = await read($, plano)
-  const falha: Falha | null = await read($, falhaAberta)
+async function mostrarSinalForte($: EngineInterface, s: Sessao, p: Passo, avisar: boolean) {
+  if (!p.sinal) return
+  const item: Item = { tipo: 'cuidado', hora: p.hora, texto: `${p.sinal.motivo}: ${p.texto}`, trecho: p.sinal.trecho }
+  await juntar($, s.id, [item])
+  if (avisar) await notificar($, `Vigia ${s.nome} · CUIDADO`, item.texto)
+}
+
+async function resumir($: EngineInterface, id: string, bloco: Passo[]) {
+  const s = await sessao($, id)
+  if (!s || bloco.length === 0) return
   const rotulos = { pedido: 'PEDIDO', fala: 'FALA', raciocinio: 'RACIOCÍNIO', comando: 'COMANDO', falha: 'FALHA', verde: 'VERDE' }
   const linhas = bloco
     .map(p => `[${p.hora}] ${rotulos[p.tipo]}: ${p.texto}${p.cmd ? `\n   $ ${p.cmd}` : ''}`)
@@ -121,9 +116,10 @@ async function resumir($: EngineInterface, bloco: Passo[]) {
     .filter(p => p.sinal && !p.sinal.forte)
     .map(p => `- [${p.hora}] ${p.sinal!.motivo}: ${p.sinal!.trecho ?? p.cmd ?? p.texto}`)
     .join('\n')
+  const falha = s.falhaAberta
   const prompt = [
-    `PLANO:\n${pl || '(nenhum plano encontrado)'}`,
-    `PEDIDO mais recente: ${ped || '(não visto)'}`,
+    `PLANO:\n${s.plano || '(nenhum plano encontrado)'}`,
+    `PEDIDO mais recente: ${s.pedido || '(não visto)'}`,
     `SINAIS:\n${sinais || '(nenhum)'}`,
     `FALHA EM ABERTO: ${falha ? `[${falha.hora}] ${falha.texto.slice(0, 300)}` : '(nenhuma)'}`,
     `PASSOS DO BLOCO:\n${linhas}`,
@@ -139,77 +135,91 @@ async function resumir($: EngineInterface, bloco: Passo[]) {
   })
   if (!r.isAnswered) {
     const fala = [...bloco].reverse().find(p => p.tipo === 'fala' || p.tipo === 'raciocinio')
-    await juntar($, [{ tipo: 'resumo', hora, texto: fala?.texto.slice(0, 200) ?? `${bloco.length} passos`, porque: `(Haiku indisponível: ${r.reason})` }])
+    await juntar($, id, [{ tipo: 'resumo', hora, texto: fala?.texto.slice(0, 200) ?? `${bloco.length} passos`, porque: `(Haiku indisponível: ${r.reason})` }])
     return
   }
   const j = lerJson<Resumo>(r.text)
   if (!j) {
-    await juntar($, [{ tipo: 'resumo', hora, texto: r.text.slice(0, 240) }])
+    await juntar($, id, [{ tipo: 'resumo', hora, texto: r.text.slice(0, 240) }])
     return
   }
   const novos: Item[] = [{ tipo: 'resumo', hora, texto: j.fez, porque: j.porque }]
   const a = j.alerta
   if (a && a.texto && (a.nivel === 'cuidado' || a.nivel === 'atencao')) {
     novos.push({ tipo: a.nivel, hora, texto: a.texto, trecho: a.trecho ?? undefined })
-    if (a.nivel === 'cuidado') await notificar($, 'Vigia · CUIDADO', a.texto)
+    if (a.nivel === 'cuidado') await notificar($, `Vigia ${s.nome} · CUIDADO`, a.texto)
   }
-  await juntar($, novos)
+  await juntar($, id, novos)
 }
 
-async function fecharBloco($: EngineInterface) {
-  const bloco = await read($, pendentes)
-  if (bloco.length === 0) return
-  await update($, pendentes, () => [])
-  await resumir($, bloco)
+async function fecharBloco($: EngineInterface, id: string) {
+  const s = await sessao($, id)
+  if (!s || s.pendentes.length === 0) return
+  const bloco = s.pendentes
+  await mudar($, id, x => ({ ...x, pendentes: [] }))
+  await resumir($, id, bloco)
+}
+
+async function vigiarUma($: EngineInterface, id: string) {
+  const s0 = await sessao($, id)
+  if (!s0) return
+  const off = s0.offset
+  const res = await $.process.run(['python3', '-I', script($), 'ler', s0.caminho, String(off)], { timeoutMs: 20000 })
+  if (res.exitCode !== 0) {
+    await mudar($, id, s => ({ ...s, agora: `erro ao ler: ${res.stderr.slice(0, 160)}` }))
+    return
+  }
+  const r = lerJson<{ offset: number; passos: Passo[]; pedido?: string }>(res.stdout)
+  if (!r) return
+  await mudar($, id, s => ({ ...s, offset: r.offset, pedido: r.pedido || s.pedido }))
+  const relogio = await $.clock.now()
+
+  if (r.passos.length === 0) {
+    const s = await sessao($, id)
+    if (s && s.pendentes.length > 0 && relogio - s.ultimaNovidade > OCIOSO_MS) await fecharBloco($, id)
+    return
+  }
+  await mudar($, id, s => ({ ...s, ultimaNovidade: relogio }))
+
+  for (const p of r.passos) {
+    const s = await sessao($, id)
+    if (!s) return
+    if (p.tipo === 'pedido') {
+      await fecharBloco($, id)
+      await mudar($, id, x => ({ ...x, pedido: p.texto }))
+      await juntar($, id, [{ tipo: 'pedido', hora: p.hora, texto: p.texto }])
+      await carregarPlano($, id, s.caminho)
+      continue
+    }
+    if (p.tipo === 'falha') await mudar($, id, x => ({ ...x, falhaAberta: { hora: p.hora, texto: p.texto } }))
+    if (p.tipo === 'verde') await mudar($, id, x => ({ ...x, falhaAberta: null }))
+    if (p.sinal?.forte) await mostrarSinalForte($, s, p, off >= 0)
+    if (p.tipo === 'comando') await mudar($, id, x => ({ ...x, agora: `${p.hora} ${p.texto}` }))
+    await mudar($, id, x => ({ ...x, pendentes: [...x.pendentes, p] }))
+    const depois = await sessao($, id)
+    const comandos = (depois?.pendentes ?? []).filter(x => x.tipo === 'comando').length
+    const falaLonga = p.tipo === 'fala' && p.texto.length > 300
+    const julgar = Boolean(p.sinal && !p.sinal.forte)
+    if (comandos >= COMANDOS_POR_BLOCO || falaLonga || julgar) await fecharBloco($, id)
+  }
+  if (off < 0) await fecharBloco($, id)
 }
 
 async function tick($: EngineInterface) {
-  if (ocupado) return
-  const a: Alvo | null = await read($, alvo)
-  if (!a) return
+  if (ocupado) {
+    deNovo = true
+    return
+  }
   ocupado = true
   try {
-    const off = await read($, offset)
-    const res = await $.process.run(['python3', '-I', script($), 'ler', a.caminho, String(off)], { timeoutMs: 20000 })
-    if (res.exitCode !== 0) {
-      await update($, agora, () => `erro ao ler: ${res.stderr.slice(0, 160)}`)
-      return
-    }
-    const r = lerJson<{ offset: number; passos: Passo[]; pedido?: string }>(res.stdout)
-    if (!r) return
-    await update($, offset, () => r.offset)
-    if (r.pedido) await update($, pedido, () => r.pedido as string)
-    const relogio = await $.clock.now()
-
-    if (r.passos.length === 0) {
-      const pend = await read($, pendentes)
-      if (pend.length > 0 && relogio - (await read($, ultimaNovidade)) > OCIOSO_MS) await fecharBloco($)
-      return
-    }
-    await update($, ultimaNovidade, () => relogio)
-
-    for (const p of r.passos) {
-      if (p.tipo === 'pedido') {
-        await fecharBloco($)
-        await update($, pedido, () => p.texto)
-        await juntar($, [{ tipo: 'pedido', hora: p.hora, texto: p.texto }])
-        await carregarPlano($, a.caminho)
-        continue
-      }
-      if (p.tipo === 'falha') await update($, falhaAberta, () => ({ hora: p.hora, texto: p.texto }))
-      if (p.tipo === 'verde') await update($, falhaAberta, () => null)
-      if (p.sinal?.forte) await mostrarSinalForte($, p, off >= 0)
-      if (p.tipo === 'comando') await update($, agora, () => `${p.hora} ${p.texto}`)
-      await update($, pendentes, (l: Passo[]) => [...l, p])
-      const pend: Passo[] = await read($, pendentes)
-      const comandos = pend.filter(x => x.tipo === 'comando').length
-      const falaLonga = p.tipo === 'fala' && p.texto.length > 300
-      const julgar = Boolean(p.sinal && !p.sinal.forte)
-      if (comandos >= COMANDOS_POR_BLOCO || falaLonga || julgar) await fecharBloco($)
-    }
-    if (off < 0) await fecharBloco($) // primeira leitura: um resumo de "onde ela está"
+    const lista: Sessao[] = await read($, sessoes)
+    for (const s of lista) await vigiarUma($, s.id)
   } finally {
     ocupado = false
+  }
+  if (deNovo) {
+    deNovo = false
+    await tick($)
   }
 }
 
@@ -219,62 +229,105 @@ function ligarRelogio($: EngineInterface) {
   cancelar = () => t.cancel()
 }
 
+function acharNaLista(lista: Sessao[], chave: string): Sessao | undefined {
+  return lista.find(s => s.id === chave || s.nome === chave || s.id.startsWith(chave))
+}
+
 async function rodarComando($: EngineInterface, arg: string): Promise<{ text: string }> {
   ligarRelogio($)
-  if (arg === 'parar') {
-    await update($, alvo, () => null)
-    await update($, pendentes, () => [])
-    return { text: 'Vigia parado.' }
+  const [primeiro = '', ...resto] = arg.split(/\s+/).filter(Boolean)
+  const lista: Sessao[] = await read($, sessoes)
+  if (primeiro === 'parar') {
+    if (resto.length === 0) {
+      await update($, sessoes, () => [])
+      return { text: 'Vigia parado.' }
+    }
+    const alvo = acharNaLista(lista, resto[0]!)
+    if (!alvo) return { text: `Não estou vigiando ${resto[0]}.` }
+    await update($, sessoes, (l: Sessao[]) => l.filter(s => s.id !== alvo.id))
+    return { text: `Parei de vigiar ${alvo.nome}.` }
   }
-  if (arg === 'limpar') {
-    await update($, itens, () => [])
+  if (primeiro === 'limpar') {
+    await update($, sessoes, (l: Sessao[]) => l.map(s => ({ ...s, itens: [] })))
     return { text: 'Painel limpo.' }
   }
-  if (!arg) {
+  if (!primeiro) {
     const eu = await $.session.id()
     const res = await $.process.run(['python3', '-I', script($), 'listar', eu])
     if (res.exitCode !== 0) throw new Error(res.stderr.trim().split('\n').pop() || `python3 saiu com ${res.exitCode}`)
-    const lista = lerJson<{ id: string; mexida: string; ultimo_pedido: string }[]>(res.stdout) ?? []
-    if (lista.length === 0) return { text: 'Nenhuma sessão ativa nas últimas 6 h.' }
+    const recentes = lerJson<{ id: string; mexida: string; ultimo_pedido: string }[]>(res.stdout) ?? []
+    const vigiando = lista.length ? `Vigiando: ${lista.map(s => s.nome).join(', ')}\n\n` : ''
+    if (recentes.length === 0) return { text: `${vigiando}Nenhuma sessão ativa nas últimas 6 h.` }
     return {
       text:
-        'Sessões ativas (use /vigia <id>):\n' +
-        lista.map(s => `  ${s.id}  ${s.mexida}  ${s.ultimo_pedido || '—'}`).join('\n'),
+        vigiando +
+        `Sessões ativas (use /vigia <id> [nome]; até ${MAX_SESSOES} ao mesmo tempo):\n` +
+        recentes.map(s => `  ${s.id}  ${s.mexida}  ${s.ultimo_pedido || '—'}`).join('\n'),
     }
   }
-  const res = await $.process.run(['python3', '-I', script($), 'achar', arg])
+  const res = await $.process.run(['python3', '-I', script($), 'achar', primeiro])
   if (res.exitCode !== 0) throw new Error(res.stderr.trim().split('\n').pop() || `python3 saiu com ${res.exitCode}`)
   const caminho = lerJson<{ caminho: string }>(res.stdout)?.caminho
-  if (!caminho) return { text: `Não achei sessão com id ${arg}.` }
+  if (!caminho) return { text: `Não achei sessão com id ${primeiro}.` }
   const id = caminho.split('/').pop()!.slice(0, 8)
-  await update($, alvo, () => ({ caminho, id }))
-  await update($, offset, () => -1)
-  await update($, pendentes, () => [])
-  await update($, pedido, () => '')
-  await update($, agora, () => '')
-  await update($, falhaAberta, () => null)
-  await update($, plano, () => '')
-  await carregarPlano($, caminho)
-  await juntar($, [{ tipo: 'aviso', hora: hhmm(), texto: `vigiando a sessão ${id}` }])
-  await $.ui.open({ id: PANE, title: `Vigia · ${id}` })
+  const nome = resto.join(' ') || id
+  const nova: Sessao = {
+    id,
+    nome,
+    caminho,
+    offset: -1,
+    itens: [{ tipo: 'aviso', hora: hhmm(), texto: `vigiando a sessão ${id}` }],
+    pendentes: [],
+    pedido: '',
+    agora: '',
+    ultimaNovidade: 0,
+    plano: '',
+    falhaAberta: null,
+  }
+  const saiu = lista.filter(s => s.id !== id).length >= MAX_SESSOES ? lista.find(s => s.id !== id) : undefined
+  await update($, sessoes, (l: Sessao[]) => [...l.filter(s => s.id !== id && s.id !== saiu?.id), nova])
+  await carregarPlano($, id, caminho)
+  const todas: Sessao[] = await read($, sessoes)
+  await $.ui.open({ id: PANE, title: `Vigia · ${todas.map(s => s.nome).join(' + ')}` })
   void tick($)
-  return { text: `Vigiando ${id}. O painel resume cada bloco; CUIDADO vira notificação no Mac.` }
+  const aviso = saiu ? ` (parei de vigiar ${saiu.nome}: o limite é ${MAX_SESSOES})` : ''
+  return { text: `Vigiando ${nome}${aviso}. Agora no painel: ${todas.map(s => s.nome).join(', ')}.` }
+}
+
+function linhasDoItem(it: Item, largura: number): number {
+  const conta = (t: string) => Math.max(1, Math.ceil(t.length / Math.max(10, largura)))
+  let n = conta(`${it.hora} ${it.texto.slice(0, 300)}`)
+  if (it.trecho) n += conta(it.trecho.slice(0, 160))
+  if (it.porque) n += conta(`   por quê: ${it.porque}`)
+  return n
+}
+
+function oQueCabe(itens: Item[], largura: number, linhas: number): Item[] {
+  const out: Item[] = []
+  let usadas = 0
+  for (let i = itens.length - 1; i >= 0; i--) {
+    const it = itens[i]!
+    const n = linhasDoItem(it, largura)
+    if (out.length > 0 && usadas + n > linhas) break
+    out.unshift(it)
+    usadas += n
+  }
+  return out
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'vigia',
-      description: 'Vigia outra sessão: /vigia (lista), /vigia <id>, /vigia parar, /vigia limpar',
-      argumentHint: '[id | parar | limpar]',
+      description: 'Vigia outras sessões: /vigia (lista), /vigia <id> [nome], /vigia parar [nome], /vigia limpar',
+      argumentHint: '[id [nome] | parar [nome] | limpar]',
     })
     ligarRelogio($)
-    if (await read($, alvo)) void $.ui.open({ id: PANE, title: 'Vigia' })
+    const lista: Sessao[] = await read($, sessoes)
+    if (lista.length) void $.ui.open({ id: PANE, title: 'Vigia' })
     return next(e)
   })
 
-  // Toda falha vira resposta: um hook que lança some como "no command.run hook answered it",
-  // sem dizer a causa (python3 ausente, $.process fora do CLI, relógio indisponível).
   on('command.run', { command: 'vigia' }, async ($, e) => {
     try {
       return await rodarComando($, (e.args || '').trim())
@@ -286,64 +339,67 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
-    const a: Alvo | null = await read($, alvo)
-    const lista: Item[] = await read($, itens)
-    const ped: string = await read($, pedido)
-    const ag: string = await read($, agora)
-    const pend: Passo[] = await read($, pendentes)
-    const falha: Falha | null = await read($, falhaAberta)
-    const visiveis = lista.slice(-VISIVEIS)
+    const lista: Sessao[] = await read($, sessoes)
+    if (lista.length === 0) return <Text bold>Vigia parado — /vigia para escolher a sessão</Text>
 
-    return (
-      <Box flexDirection="column">
-        <Text bold>{a ? `Vigiando ${a.id}` : 'Vigia parado — /vigia para escolher a sessão'}</Text>
-        {ped ? <Text dimColor>Pedido: {ped.slice(0, 160)}</Text> : null}
-        {falha ? <Text dimColor>teste vermelho em aberto (o agente está corrigindo)</Text> : null}
-        <Text dimColor> </Text>
-        {visiveis.length === 0 && <Text dimColor>Nada ainda.</Text>}
-        {visiveis.map(it => {
-          if (it.tipo === 'cuidado')
+    const colunasTotal = e.props.bodyColumns || e.viewport?.columns || 80
+    const linhasTotal = Math.max(10, (e.props.scroll?.bodyRows || e.viewport?.rows || 30) - 1)
+    const ladoALado = lista.length > 1 && colunasTotal / lista.length >= LARGURA_MINIMA_COLUNA
+    const largura = ladoALado ? Math.floor(colunasTotal / lista.length) - 2 : colunasTotal
+    const linhasPorSessao = ladoALado ? linhasTotal : Math.floor(linhasTotal / lista.length)
+
+    const secao = (s: Sessao) => {
+      const cabecalho = 3 + (s.pedido ? 1 : 0) + (s.falhaAberta ? 1 : 0)
+      const visiveis = oQueCabe(s.itens, largura, Math.max(2, linhasPorSessao - cabecalho))
+      return (
+        <Box flexDirection="column" width={ladoALado ? `${Math.floor(100 / lista.length)}%` : '100%'} paddingRight={ladoALado ? 1 : 0}>
+          <Text bold>{s.nome === s.id ? `Vigiando ${s.id}` : `${s.nome} · ${s.id}`}</Text>
+          {s.pedido ? <Text dimColor wrap="truncate-end">Pedido: {s.pedido.slice(0, 160)}</Text> : null}
+          {s.falhaAberta ? <Text dimColor>teste vermelho em aberto (o agente está corrigindo)</Text> : null}
+          {visiveis.length === 0 && <Text dimColor>Nada ainda.</Text>}
+          {visiveis.map(it => {
+            if (it.tipo === 'cuidado')
+              return (
+                <Box flexDirection="column">
+                  <Text color="error" bold>
+                    {it.hora} CUIDADO · {it.texto.slice(0, 300)}
+                  </Text>
+                  {it.trecho ? <Text color="error" dimColor>   "{it.trecho.slice(0, 160)}"</Text> : null}
+                </Box>
+              )
+            if (it.tipo === 'atencao')
+              return (
+                <Box flexDirection="column">
+                  <Text color="warning">
+                    {it.hora} Atenção · {it.texto.slice(0, 300)}
+                  </Text>
+                  {it.trecho ? <Text dimColor>   {it.trecho.slice(0, 160)}</Text> : null}
+                </Box>
+              )
+            if (it.tipo === 'pedido')
+              return (
+                <Text color="suggestion">
+                  {it.hora} Você pediu: {it.texto.slice(0, 200)}
+                </Text>
+              )
+            if (it.tipo === 'aviso') return <Text dimColor>{it.hora} {it.texto}</Text>
             return (
               <Box flexDirection="column">
-                <Text color="error" bold>
-                  {it.hora} CUIDADO · {it.texto}
+                <Text>
+                  {it.hora} {it.texto.slice(0, 300)}
                 </Text>
-                {it.trecho ? <Text color="error" dimColor>   "{it.trecho}"</Text> : null}
+                {it.porque ? <Text dimColor>   por quê: {it.porque}</Text> : null}
               </Box>
             )
-          if (it.tipo === 'atencao')
-            return (
-              <Box flexDirection="column">
-                <Text color="warning">
-                  {it.hora} Atenção · {it.texto}
-                </Text>
-                {it.trecho ? <Text dimColor>   {it.trecho.slice(0, 160)}</Text> : null}
-              </Box>
-            )
-          if (it.tipo === 'pedido')
-            return (
-              <Text color="suggestion">
-                {it.hora} Você pediu: {it.texto.slice(0, 200)}
-              </Text>
-            )
-          if (it.tipo === 'aviso') return <Text dimColor>{it.hora} {it.texto}</Text>
-          return (
-            <Box flexDirection="column">
-              <Text>
-                {it.hora} {it.texto}
-              </Text>
-              {it.porque ? <Text dimColor>   por quê: {it.porque}</Text> : null}
-            </Box>
-          )
-        })}
-        <Text dimColor> </Text>
-        {a ? (
-          <Text dimColor>
-            agora: {ag || '—'}
-            {pend.length ? `  (${pend.length} passos no bloco)` : ''}
+          })}
+          <Text dimColor wrap="truncate-end">
+            agora: {s.agora || '—'}
+            {s.pendentes.length ? `  (${s.pendentes.length} passos no bloco)` : ''}
           </Text>
-        ) : null}
-      </Box>
-    )
+        </Box>
+      )
+    }
+
+    return <Box flexDirection={ladoALado ? 'row' : 'column'}>{lista.map(secao)}</Box>
   })
 }
