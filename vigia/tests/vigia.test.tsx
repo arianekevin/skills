@@ -49,7 +49,7 @@ function engine(on: any) {
   })
 }
 
-test('duas sessões aparecem juntas e cada uma mostra o mais recente', async ($, on) => {
+test('lado a lado guarda o histórico para rolar; uma embaixo da outra mostra só o mais recente', async ($, on) => {
   engine(on)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'vigia', args: 'aaaa ndesk', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 200 } })
@@ -61,8 +61,13 @@ test('duas sessões aparecem juntas e cada uma mostra o mais recente', async ($,
     expect((await ui.find({ type: 'Text', text: /^bugfix · bbbb/ }))?.text).toBeTruthy()
     expect((await ui.find({ type: 'Text', text: /CUIDADO · apaga arquivos: apaga pasta de ndesk/ }))?.text).toBeTruthy()
     expect((await ui.find({ type: 'Text', text: /CUIDADO · apaga arquivos: apaga pasta de bugfix/ }))?.text).toBeTruthy()
-    expect(await ui.find({ type: 'Text', text: /ndesk antigo 0 / })).toBeFalsy()
-    expect((await ui.findAll({ type: 'Text' })).length).toBeLessThanOrEqual(36 + 2)
+    if (largura >= 90) {
+      expect((await ui.find({ type: 'Text', text: /vigiando a sessão aaaa/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /vigiando a sessão bbbb/ }))?.text).toBeTruthy()
+    } else {
+      expect(await ui.find({ type: 'Text', text: /vigiando a sessão aaaa/ })).toBeFalsy()
+      expect((await ui.findAll({ type: 'Text' })).length).toBeLessThanOrEqual(36 + 2)
+    }
     await ui.unmount()
   }
 })

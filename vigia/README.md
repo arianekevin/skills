@@ -39,7 +39,9 @@ Requer `python3` no PATH. Reinicie a sessão depois de instalar.
 ```
 
 Até 3 sessões ao mesmo tempo, num painel só: lado a lado quando o painel tem largura (45 colunas por sessão),
-uma embaixo da outra quando não tem. Cada uma mostra os itens mais recentes que cabem na altura.
+uma embaixo da outra quando não tem. Com uma sessão só ou lado a lado, o painel guarda os últimos 200 itens de cada uma: role com a roda do mouse,
+ou clique no painel e use as setas, PgUp/PgDn, Home/End. Uma embaixo da outra, cada uma mostra só os itens mais
+recentes que cabem na altura.
 
 ## Ajustar os alertas
 

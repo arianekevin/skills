@@ -289,6 +289,7 @@ async function rodarComando($: EngineInterface, arg: string): Promise<{ text: st
   await carregarPlano($, id, caminho)
   const todas: Sessao[] = await read($, sessoes)
   await $.ui.open({ id: PANE, title: `Vigia · ${todas.map(s => s.nome).join(' + ')}` })
+  irParaOFim($)
   void tick($)
   const aviso = saiu ? ` (parei de vigiar ${saiu.nome}: o limite é ${MAX_SESSOES})` : ''
   return { text: `Vigiando ${nome}${aviso}. Agora no painel: ${todas.map(s => s.nome).join(', ')}.` }
@@ -315,6 +316,10 @@ function oQueCabe(itens: Item[], largura: number, linhas: number): Item[] {
   return out
 }
 
+function irParaOFim($: EngineInterface) {
+  void $.ui.scroll({ in: PANE, to: 'end' }).catch(() => undefined)
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -324,7 +329,7 @@ export const register: Register = on => {
     })
     ligarRelogio($)
     const lista: Sessao[] = await read($, sessoes)
-    if (lista.length) void $.ui.open({ id: PANE, title: 'Vigia' })
+    if (lista.length) void $.ui.open({ id: PANE, title: 'Vigia' }).then(() => irParaOFim($))
     return next(e)
   })
 
@@ -345,14 +350,15 @@ export const register: Register = on => {
     const colunasTotal = e.props.bodyColumns || e.viewport?.columns || 80
     const linhasTotal = Math.max(10, (e.props.scroll?.bodyRows || e.viewport?.rows || 30) - 1)
     const ladoALado = lista.length > 1 && colunasTotal / lista.length >= LARGURA_MINIMA_COLUNA
+    const umaEmbaixoDaOutra = lista.length > 1 && !ladoALado
     const largura = ladoALado ? Math.floor(colunasTotal / lista.length) - 2 : colunasTotal
     const linhasPorSessao = ladoALado ? linhasTotal : Math.floor(linhasTotal / lista.length)
 
     const secao = (s: Sessao) => {
       const cabecalho = 3 + (s.pedido ? 1 : 0) + (s.falhaAberta ? 1 : 0)
-      const visiveis = oQueCabe(s.itens, largura, Math.max(2, linhasPorSessao - cabecalho))
+      const visiveis = umaEmbaixoDaOutra ? oQueCabe(s.itens, largura, Math.max(2, linhasPorSessao - cabecalho)) : s.itens
       return (
-        <Box flexDirection="column" width={ladoALado ? `${Math.floor(100 / lista.length)}%` : '100%'} paddingRight={ladoALado ? 1 : 0}>
+        <Box flexDirection="column" justifyContent="flex-end" width={ladoALado ? `${Math.floor(100 / lista.length)}%` : '100%'} paddingRight={ladoALado ? 1 : 0}>
           <Text bold>{s.nome === s.id ? `Vigiando ${s.id}` : `${s.nome} · ${s.id}`}</Text>
           {s.pedido ? <Text dimColor wrap="truncate-end">Pedido: {s.pedido.slice(0, 160)}</Text> : null}
           {s.falhaAberta ? <Text dimColor>teste vermelho em aberto (o agente está corrigindo)</Text> : null}
